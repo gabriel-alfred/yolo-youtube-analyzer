@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import Button from '$lib/components/ui/Button.svelte';
   
   let scrolled = $state(false);
   let mobileMenuOpen = $state(false);
@@ -15,7 +16,7 @@
 </script>
 
 <header 
-  class="sticky top-0 z-50 transition-all duration-300 {scrolled ? 'backdrop-blur-xl bg-slate-900/80 border-b border-red-500/20 shadow-lg shadow-red-500/10' : ''}"
+  class="sticky top-0 z-50 transition-all duration-500 ease-in-out"
 >
   <div class="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-7xl">
     <div class="flex items-center justify-between">
@@ -65,20 +66,19 @@
           <span class="text-xs font-medium text-green-300">YOLOv11 Ready</span>
         </div>
 
-        <!-- CTA Button -->
-        <button 
-          class="relative px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 font-semibold text-white rounded-lg overflow-hidden group"
-          aria-label="Iniciar nuevo análisis de video"
+        <!-- CTA Button using Button Component -->
+        <Button 
+          size="sm" 
+          class="text-xs sm:text-sm px-3 sm:px-4 md:px-5 py-1.5 sm:py-2"
         >
-          <div class="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-600 group-hover:from-red-500 group-hover:to-orange-500 transition-all"></div>
-          <div class="absolute inset-0 bg-gradient-to-r from-red-600 via-orange-600 to-red-600 opacity-0 group-hover:opacity-100 blur-xl transition-opacity"></div>
-          <span class="relative z-10 flex items-center space-x-1 sm:space-x-2">
-            <span class="text-xs sm:text-sm">Nuevo Análisis</span>
+          {#snippet icon()}
             <svg class="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-          </span>
-        </button>
+          {/snippet}
+          <span class="hidden xs:inline">Nuevo Análisis</span>
+          <span class="xs:hidden">Analizar</span>
+        </Button>
 
         <!-- Mobile Menu Button -->
         <button 

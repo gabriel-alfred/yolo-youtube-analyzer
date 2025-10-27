@@ -25,7 +25,7 @@
   
   const variantClasses: Record<Variant, string> = {
     default: 'bg-slate-900/70 border border-red-500/20',
-    gradient: 'bg-slate-900/80 border border-red-500/30',
+    gradient: 'bg-gradient-to-br from-slate-900/90 via-red-950/40 to-slate-900/90 border border-red-500/30',
     glass: 'backdrop-blur-xl bg-slate-900/40 border border-red-500/20 shadow-xl',
     elevated: 'bg-slate-900/80 border border-red-500/30 shadow-2xl shadow-red-500/10'
   };
@@ -46,6 +46,11 @@
 </script>
 
 <div class={combinedClasses}>
+  <!-- Gradient Overlay for Gradient Variant -->
+  {#if variant === 'gradient'}
+    <div class="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+  {/if}
+  
   <!-- Header -->
   {#if header}
     <div class="px-6 py-4 border-b border-red-500/20 bg-slate-900/30">

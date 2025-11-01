@@ -11,6 +11,9 @@
     disabled?: boolean;
     required?: boolean;
     fullWidth?: boolean;
+    min?: number | string;
+    max?: number | string;
+    step?: number | string;
     icon?: import('svelte').Snippet;
     rightIcon?: import('svelte').Snippet;
     oninput?: (e: Event) => void;
@@ -28,6 +31,9 @@
     disabled = false,
     required = false,
     fullWidth = false,
+    min,
+    max,
+    step,
     icon,
     rightIcon,
     oninput,
@@ -91,6 +97,9 @@
       {placeholder}
       {disabled}
       {required}
+      min={min}
+      max={max}
+      step={step}
       bind:value
       class={getCombinedClasses()}
       onfocus={() => focused = true}

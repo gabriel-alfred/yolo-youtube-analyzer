@@ -512,10 +512,17 @@
     {/snippet}
 
     <div
+      role="button"
+      tabindex="0"
       class="border-2 border-dashed rounded-xl p-12 transition-all duration-300 {isDragging ? 'border-red-500 bg-red-500/10' : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'}"
       ondragover={handleDragOver}
       ondragleave={handleDragLeave}
       ondrop={handleDrop}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+        }
+      }}
     >
       <div class="flex flex-col items-center justify-center gap-4 text-center">
         <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -529,7 +536,7 @@
             {isDragging ? 'Suelta el archivo aquí' : 'Arrastra y suelta tu modelo'}
           </h3>
           <p class="text-sm text-red-300/70">
-            Formatos aceptados: .pt, .onnx, .engine (máx. 100MB)
+            Formatos aceptados: .pt, .onnx (máx. 100MB)
           </p>
         </div>
 
@@ -614,6 +621,7 @@
         <button
           onclick={() => classModalOpen = false}
           class="w-10 h-10 rounded-lg hover:bg-red-500/10 transition-colors flex items-center justify-center text-red-300 hover:text-red-100"
+          aria-label="Cerrar modal de selección de clases"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

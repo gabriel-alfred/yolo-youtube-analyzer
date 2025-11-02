@@ -14,6 +14,10 @@
     goto('/');
   };
   
+  const navigateToModels = () => {
+    goto('/models');
+  };
+  
   const handleKeyPress = (e: KeyboardEvent, callback: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -72,7 +76,10 @@
         ] as item}
           <button 
             class="px-3 xl:px-4 py-2 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all relative group flex items-center gap-2"
-            onclick={() => item.label === 'Análisis' ? navigateToAnalysis() : null}
+            onclick={() => {
+              if (item.label === 'Análisis') navigateToAnalysis();
+              else if (item.label === 'Modelos') navigateToModels();
+            }}
             aria-label={`Ir a ${item.label}`}
           >
             <svg class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +150,10 @@
           ] as item}
             <button 
               class="w-full px-4 py-3 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all flex items-center gap-3 text-left"
-              onclick={() => item.label === 'Análisis' ? navigateToAnalysis() : null}
+              onclick={() => {
+                if (item.label === 'Análisis') navigateToAnalysis();
+                else if (item.label === 'Modelos') navigateToModels();
+              }}
               aria-label={`Ir a ${item.label}`}
             >
               <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">

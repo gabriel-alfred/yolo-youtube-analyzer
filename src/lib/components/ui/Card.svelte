@@ -9,6 +9,7 @@
     footer?: import('svelte').Snippet;
     children: import('svelte').Snippet;
     class?: string;
+    allowOverflow?: boolean; // Nueva prop para controlar el overflow
   }
   
   let {
@@ -18,10 +19,11 @@
     header,
     footer,
     children,
-    class: className = ''
+    class: className = '',
+    allowOverflow = false
   }: Props = $props();
   
-  const baseClasses = 'rounded-xl transition-all duration-300 overflow-hidden';
+  const baseClasses = 'rounded-xl transition-all duration-300';
   
   const variantClasses: Record<Variant, string> = {
     default: 'bg-slate-900/70 border border-red-500/20',
@@ -34,6 +36,8 @@
     ? 'hover:border-red-500/50 hover:shadow-xl hover:shadow-red-500/10 hover:-translate-y-1 cursor-pointer' 
     : '';
   
+  const overflowClass = allowOverflow ? 'overflow-visible' : 'overflow-hidden';
+  
   const paddingClasses: Record<typeof padding, string> = {
     none: '',
     sm: 'p-4',
@@ -41,7 +45,7 @@
     lg: 'p-8'
   };
   
-  const combinedClasses = `${baseClasses} ${variantClasses[variant]} ${hoverClasses} ${className}`;
+  const combinedClasses = `${baseClasses} ${variantClasses[variant]} ${hoverClasses} ${overflowClass} ${className}`;
   const contentPadding = header || footer ? '' : paddingClasses[padding];
 </script>
 

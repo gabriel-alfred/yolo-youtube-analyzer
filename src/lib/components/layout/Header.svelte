@@ -26,6 +26,10 @@
     goto('/monitoring');
   };
   
+  const navigateToSettings = () => {
+    goto('/settings');
+  };
+  
   const handleKeyPress = (e: KeyboardEvent, callback: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -89,6 +93,7 @@
               else if (item.label === 'Modelos') navigateToModels();
               else if (item.label === 'Resultados') navigateToResults();
               else if (item.label === 'Monitoreo') navigateToMonitoring();
+              else if (item.label === 'Config') navigateToSettings();
             }}
             aria-label={`Ir a ${item.label}`}
           >
@@ -165,6 +170,7 @@
                 else if (item.label === 'Modelos') navigateToModels();
                 else if (item.label === 'Resultados') navigateToResults();
                 else if (item.label === 'Monitoreo') navigateToMonitoring();
+                else if (item.label === 'Configuración') navigateToSettings();
                 mobileMenuOpen = false;
               }}
               aria-label={`Ir a ${item.label}`}

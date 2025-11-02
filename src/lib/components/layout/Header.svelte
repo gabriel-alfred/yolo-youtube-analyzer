@@ -1,9 +1,41 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import Button from '$lib/components/ui/Button.svelte';
   
   let scrolled = $state(false);
   let mobileMenuOpen = $state(false);
+  
+  const navigateToAnalysis = () => {
+    goto('/analysis');
+  };
+  
+  const navigateToHome = () => {
+    goto('/');
+  };
+  
+  const navigateToModels = () => {
+    goto('/models');
+  };
+  
+  const navigateToResults = () => {
+    goto('/results');
+  };
+  
+  const navigateToMonitoring = () => {
+    goto('/monitoring');
+  };
+  
+  const navigateToSettings = () => {
+    goto('/settings');
+  };
+  
+  const handleKeyPress = (e: KeyboardEvent, callback: () => void) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      callback();
+    }
+  };
   
   onMount(() => {
     const handleScroll = () => {
@@ -16,12 +48,18 @@
 </script>
 
 <header 
-  class="sticky top-0 z-50 transition-all duration-500 ease-in-out"
+  class="sticky top-0 z-50 transition-all duration-500 ease-in-out bg-slate-950/50 backdrop-blur-sm border-b border-red-500/20"
+  class:scrolled
 >
   <div class="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-7xl">
     <div class="flex items-center justify-between">
       <!-- Logo/Brand -->
-      <div class="flex items-center space-x-2 sm:space-x-3 group cursor-pointer">
+      <button 
+        class="flex items-center space-x-2 sm:space-x-3 group cursor-pointer bg-transparent border-none p-0"
+        onclick={navigateToHome}
+        onkeydown={(e) => handleKeyPress(e, navigateToHome)}
+        aria-label="Ir a la página de inicio"
+      >
         <div class="relative">
           <div class="absolute inset-0 bg-red-500 blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
           <div class="relative w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-red-500/50 group-hover:shadow-red-500/75 transition-all group-hover:scale-110">
@@ -37,7 +75,7 @@
           </h1>
           <p class="text-[10px] sm:text-xs text-red-400/60 font-medium tracking-wider hidden xs:block">YOUTUBE VIDEO DETECTION</p>
         </div>
-      </div>
+      </button>
 
       <!-- Desktop Navigation -->
       <nav class="hidden lg:flex items-center space-x-1">
@@ -48,7 +86,17 @@
           { label: 'Monitoreo', icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z' },
           { label: 'Config', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' }
         ] as item}
-          <button class="px-3 xl:px-4 py-2 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all relative group flex items-center gap-2">
+          <button 
+            class="px-3 xl:px-4 py-2 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all relative group flex items-center gap-2"
+            onclick={() => {
+              if (item.label === 'Análisis') navigateToAnalysis();
+              else if (item.label === 'Modelos') navigateToModels();
+              else if (item.label === 'Resultados') navigateToResults();
+              else if (item.label === 'Monitoreo') navigateToMonitoring();
+              else if (item.label === 'Config') navigateToSettings();
+            }}
+            aria-label={`Ir a ${item.label}`}
+          >
             <svg class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{item.icon}" />
             </svg>
@@ -70,6 +118,7 @@
         <Button 
           size="sm" 
           class="text-xs sm:text-sm px-3 sm:px-4 md:px-5 py-1.5 sm:py-2"
+          onclick={navigateToAnalysis}
         >
           {#snippet icon()}
             <svg class="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +163,18 @@
             { label: 'Monitoreo', icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z' },
             { label: 'Configuración', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' }
           ] as item}
-            <button class="w-full px-4 py-3 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all flex items-center gap-3 text-left">
+            <button 
+              class="w-full px-4 py-3 text-sm font-medium text-red-100/80 hover:text-red-100 hover:bg-red-500/10 rounded-lg transition-all flex items-center gap-3 text-left"
+              onclick={() => {
+                if (item.label === 'Análisis') navigateToAnalysis();
+                else if (item.label === 'Modelos') navigateToModels();
+                else if (item.label === 'Resultados') navigateToResults();
+                else if (item.label === 'Monitoreo') navigateToMonitoring();
+                else if (item.label === 'Configuración') navigateToSettings();
+                mobileMenuOpen = false;
+              }}
+              aria-label={`Ir a ${item.label}`}
+            >
               <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{item.icon}" />
               </svg>
@@ -126,4 +186,19 @@
       </nav>
     {/if}
   </div>
+  
+  <!-- Subtle Glow Effect -->
+  <div class="absolute inset-0 bg-gradient-to-b from-red-500/5 to-transparent pointer-events-none"></div>
 </header>
+
+<style>
+  header {
+    transition: all 0.3s ease-in-out;
+    position: relative;
+  }
+  
+  header.scrolled {
+    background-color: rgba(2, 6, 23, 0.7);
+    border-bottom-color: rgba(239, 68, 68, 0.3);
+  }
+</style>

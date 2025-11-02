@@ -18,6 +18,10 @@
     goto('/models');
   };
   
+  const navigateToResults = () => {
+    goto('/results');
+  };
+  
   const handleKeyPress = (e: KeyboardEvent, callback: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -79,6 +83,7 @@
             onclick={() => {
               if (item.label === 'Análisis') navigateToAnalysis();
               else if (item.label === 'Modelos') navigateToModels();
+              else if (item.label === 'Resultados') navigateToResults();
             }}
             aria-label={`Ir a ${item.label}`}
           >
@@ -153,6 +158,8 @@
               onclick={() => {
                 if (item.label === 'Análisis') navigateToAnalysis();
                 else if (item.label === 'Modelos') navigateToModels();
+                else if (item.label === 'Resultados') navigateToResults();
+                mobileMenuOpen = false;
               }}
               aria-label={`Ir a ${item.label}`}
             >

@@ -239,8 +239,31 @@ pub fn run() {
             check_model_exists,
             download_model,
             delete_model,
-            get_file_size
+            get_file_size,
+            import_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// Comando para importar un modelo local
+#[tauri::command]
+fn import_model(app: tauri::AppHandle, file_path: String) -> Result<String, String> {
+    let models_dir = resolve_models_dir(&app)?;
+    let source_path = PathBuf::from(&file_path);
+    
+    if !source_path.exists() {
+        return Err("El archivo de origen no existe".to_string());
+    }
+    
+    let file_name = source_path.file_name()
+        .ok_or("Nombre de archivo inválido")?
+        .to_string_lossy()
+        .to_string();
+        
+    let dest_path = models_dir.join(&file_name);
+    
+    fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
+    
+    Ok(file_name)
 }

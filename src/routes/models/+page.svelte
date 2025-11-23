@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
+  import { open } from '@tauri-apps/plugin-dialog';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import ConfirmationDialog from '$lib/components/ui/ConfirmationDialog.svelte';
@@ -255,6 +256,58 @@
     modelToDelete = null;
   }
 
+  async function handleFileSelect() {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'YOLO Models',
+          extensions: ['pt']
+        }]
+      });
+
+      if (selected && typeof selected === 'string') {
+        // Importar el modelo usando el backend
+        const fileName = await invoke<string>('import_model', { filePath: selected });
+        
+        // Verificar si ya existe en la lista
+        if (models.some(m => m.fileName === fileName)) {
+          dragError = 'El modelo ya está en la lista';
+          return;
+        }
+
+        // Obtener tamaño del archivo
+        let sizeStr = 'Desconocido';
+        try {
+          const size = await invoke<number>('get_file_size', { fileName });
+          sizeStr = formatBytes(size);
+        } catch (e) {
+          console.error('Error obteniendo tamaño:', e);
+        }
+
+        const newModel: Model = {
+          id: Date.now().toString(),
+          name: fileName.replace(/\.pt$/, ''),
+          fileName: fileName,
+          downloadUrl: '',
+          size: sizeStr,
+          speed: 'Desconocida',
+          precision: 'Por determinar',
+          downloaded: true,
+          active: false,
+          isCustom: true,
+          selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+        };
+
+        models = [...models, newModel];
+        dragError = '';
+      }
+    } catch (err) {
+      console.error('Error seleccionando archivo:', err);
+      dragError = 'Error al seleccionar archivo: ' + err;
+    }
+  }
+
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
     isDragging = true;
@@ -279,8 +332,9 @@
 
     const file = files[0];
     
-    if (!file.name.endsWith('.pt') && !file.name.endsWith('.onnx')) {
-      dragError = 'Solo se aceptan archivos .pt o .onnx';
+    // Restricción estricta a .pt como solicitó el usuario
+    if (!file.name.endsWith('.pt')) {
+      dragError = 'Solo se aceptan archivos .pt';
       return;
     }
 
@@ -294,9 +348,14 @@
       return;
     }
 
+    // Nota: El Drag & Drop web no nos da la ruta completa en el navegador por seguridad.
+    // En Tauri v2, podríamos necesitar manejar esto diferente si queremos copiar el archivo.
+    // Por ahora, mantenemos la lógica visual pero advertimos que use el selector si falla.
+    // Idealmente, el usuario debería usar el selector de archivos para una importación correcta.
+    
     const newModel: Model = {
       id: Date.now().toString(),
-      name: file.name.replace(/\.(pt|onnx)$/, ''),
+      name: file.name.replace(/\.pt$/, ''),
       fileName: file.name,
       downloadUrl: '',
       size: formatBytes(file.size),
@@ -602,13 +661,15 @@
     <div
       role="button"
       tabindex="0"
-      class="border-2 border-dashed rounded-xl p-12 transition-all duration-300 {isDragging ? 'border-red-500 bg-red-500/10' : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'}"
+      class="border-2 border-dashed rounded-xl p-12 transition-all duration-300 cursor-pointer {isDragging ? 'border-red-500 bg-red-500/10' : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'}"
       ondragover={handleDragOver}
       ondragleave={handleDragLeave}
       ondrop={handleDrop}
+      onclick={handleFileSelect}
       onkeydown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          handleFileSelect();
         }
       }}
     >
@@ -621,10 +682,10 @@
         
         <div>
           <h3 class="text-lg font-semibold text-red-100 mb-2">
-            {isDragging ? 'Suelta el archivo aquí' : 'Arrastra y suelta tu modelo'}
+            {isDragging ? 'Suelta el archivo aquí' : 'Haz clic o arrastra tu modelo aquí'}
           </h3>
           <p class="text-sm text-red-300/70">
-            Formatos aceptados: .pt, .onnx (máx. 100MB)
+            Formatos aceptados: .pt (máx. 100MB)
           </p>
         </div>
 

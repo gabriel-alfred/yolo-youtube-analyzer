@@ -1,6 +1,7 @@
 use tauri::Manager;
-use tauri::Emitter; // Fix for emit method
+use tauri::Emitter;
 use std::fs;
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -11,30 +12,102 @@ pub struct DownloadProgress {
     percentage: f32,
 }
 
-// Comando para obtener el directorio de modelos
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppConfig {
+    models_path: Option<String>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            models_path: None,
+        }
+    }
+}
+
+fn get_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|p| p.join("config.json"))
+        .map_err(|e| e.to_string())
+}
+
+fn load_config(app: &tauri::AppHandle) -> AppConfig {
+    if let Ok(config_path) = get_config_path(app) {
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(config) = serde_json::from_str(&content) {
+                    return config;
+                }
+            }
+        }
+    }
+    AppConfig::default()
+}
+
+fn save_config(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
+    let config_path = get_config_path(app)?;
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    fs::write(config_path, content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn resolve_models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let config = load_config(app);
+    
+    if let Some(path_str) = config.models_path {
+        let path = PathBuf::from(path_str);
+        if !path.exists() {
+             fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+        }
+        return Ok(path);
+    }
+
+    // Default to Documents/YoloModels if available, otherwise AppData/models
+    let default_path = if let Ok(docs_dir) = app.path().document_dir() {
+        docs_dir.join("YoloModels")
+    } else {
+        app.path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("models")
+    };
+
+    if !default_path.exists() {
+        fs::create_dir_all(&default_path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(default_path)
+}
+
+#[tauri::command]
+fn get_current_models_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let path = resolve_models_dir(&app)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn set_models_dir(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let mut config = load_config(&app);
+    config.models_path = Some(path);
+    save_config(&app, &config)?;
+    Ok(())
+}
+
+// Comando para obtener el directorio de modelos (usado internamente o por frontend)
 #[tauri::command]
 fn get_models_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
-    // Crear directorio si no existe
-    fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
-    
+    let models_dir = resolve_models_dir(&app)?;
     Ok(models_dir.to_string_lossy().to_string())
 }
 
 // Comando para listar modelos descargados
 #[tauri::command]
 fn list_downloaded_models(app: tauri::AppHandle) -> Result<Vec<String>, String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
-    // Crear directorio si no existe
-    fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
+    let models_dir = resolve_models_dir(&app)?;
     
     let mut models = Vec::new();
     
@@ -54,11 +127,7 @@ fn list_downloaded_models(app: tauri::AppHandle) -> Result<Vec<String>, String> 
 // Comando para verificar si un modelo existe
 #[tauri::command]
 fn check_model_exists(app: tauri::AppHandle, file_name: String) -> Result<bool, String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
+    let models_dir = resolve_models_dir(&app)?;
     let model_path = models_dir.join(&file_name);
     Ok(model_path.exists())
 }
@@ -72,13 +141,7 @@ async fn download_model(
     file_name: String,
     url: String,
 ) -> Result<String, String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
-    fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
-    
+    let models_dir = resolve_models_dir(&app)?;
     let file_path = models_dir.join(&file_name);
     
     // Usar reqwest para descargar
@@ -139,11 +202,7 @@ async fn download_model(
 // Comando para eliminar un modelo
 #[tauri::command]
 fn delete_model(app: tauri::AppHandle, file_name: String) -> Result<(), String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
+    let models_dir = resolve_models_dir(&app)?;
     let file_path = models_dir.join(&file_name);
     
     if file_path.exists() {
@@ -156,11 +215,7 @@ fn delete_model(app: tauri::AppHandle, file_name: String) -> Result<(), String> 
 // Comando para obtener el tamaño de un archivo
 #[tauri::command]
 fn get_file_size(app: tauri::AppHandle, file_name: String) -> Result<u64, String> {
-    let models_dir = app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    
+    let models_dir = resolve_models_dir(&app)?;
     let file_path = models_dir.join(&file_name);
     
     if file_path.exists() {
@@ -175,8 +230,11 @@ fn get_file_size(app: tauri::AppHandle, file_name: String) -> Result<u64, String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_models_dir,
+            get_current_models_dir,
+            set_models_dir,
             list_downloaded_models,
             check_model_exists,
             download_model,

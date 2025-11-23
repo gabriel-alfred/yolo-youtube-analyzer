@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { open } from '@tauri-apps/plugin-dialog';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import ErrorMessage from '$lib/components/ui/ErrorMessage.svelte';
@@ -17,12 +20,41 @@
   let compressResults = $state(true);
   let keepOriginalVideos = $state(false);
   let maxStorageSize = $state(50);
+  let modelsPath = $state('');
 
   const languages = [
     { id: 'es', name: 'Español', flag: '🇪🇸' },
     { id: 'en', name: 'English', flag: '🇺🇸' },
     { id: 'eu', name: 'Euskera', flag: '🟥🟩⬜' }
   ];
+
+  onMount(async () => {
+    try {
+      modelsPath = await invoke('get_current_models_dir');
+    } catch (err) {
+      console.error('Error loading models path:', err);
+    }
+  });
+
+  async function changeModelsFolder() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Seleccionar carpeta de modelos'
+      });
+      
+      if (selected && typeof selected === 'string') {
+        await invoke('set_models_dir', { path: selected });
+        modelsPath = selected;
+        saveSuccess = true;
+        setTimeout(() => saveSuccess = false, 3000);
+      }
+    } catch (err) {
+      saveError = 'Error al cambiar la carpeta: ' + err;
+      setTimeout(() => saveError = '', 3000);
+    }
+  }
 
   function handleSave() {
     saveError = '';
@@ -241,6 +273,25 @@
     {/snippet}
 
     <div class="space-y-6">
+      <!-- Models Path -->
+      <div>
+        <div class="text-sm font-medium text-red-200 mb-2">Ubicación de Modelos</div>
+        <div class="flex gap-3">
+          <div class="flex-1 p-3 bg-slate-900/60 border border-red-500/20 rounded-lg text-sm text-red-100/80 font-mono truncate">
+            {modelsPath || 'Cargando...'}
+          </div>
+          <Button variant="secondary" onclick={changeModelsFolder}>
+            {#snippet icon()}
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            {/snippet}
+            Cambiar
+          </Button>
+        </div>
+        <p class="text-xs text-red-300/60 mt-1">Carpeta donde se guardan los modelos descargados</p>
+      </div>
+
       <!-- Compress Results -->
       <label for="compressResults" class="flex items-center gap-3 cursor-pointer group p-3 bg-slate-900/40 border border-red-500/20 rounded-lg hover:border-red-500/40 transition-all">
         <input

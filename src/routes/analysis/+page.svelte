@@ -1,21 +1,15 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import Input from '$lib/components/ui/Input.svelte';
-
-  // Clases COCO para YOLOv11
-  const COCO_CLASSES = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
-    'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
-    'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
-    'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
-    'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-    'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
-    'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-  ];
+  import { 
+    COCO_CLASSES, 
+    DEFAULT_MODELS, 
+    getDownloadedModels, 
+    mergeModelsWithDownloads, 
+    type Model 
+  } from '$lib/models';
 
   // Colores predefinidos
   const PRESET_COLORS = [
@@ -24,10 +18,11 @@
     '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'
   ];
 
-  const models = ['YOLOv11n', 'YOLOv11s', 'YOLOv11m', 'YOLOv11l', 'YOLOv11x'];
+  let models = $state<Model[]>([]);
+  let availableModels = $derived(models.filter(m => m.downloaded));
 
   let youtubeUrl = $state('');
-  let selectedModel = $state('YOLOv11n');
+  let selectedModel = $state('');
   let modelDropdownOpen = $state(false);
   let frames = $state(1);
   let quality = $state(75);
@@ -43,6 +38,15 @@
   let classColors = $state(
     COCO_CLASSES.reduce((acc, cls, idx) => ({ ...acc, [cls]: PRESET_COLORS[idx % PRESET_COLORS.length] }), {})
   );
+
+  onMount(async () => {
+    const downloadedFiles = await getDownloadedModels();
+    models = mergeModelsWithDownloads(DEFAULT_MODELS, downloadedFiles);
+    // Select first available model if any
+    if (availableModels.length > 0 && !selectedModel) {
+      selectedModel = availableModels[0].name;
+    }
+  });
 
   function extractYoutubeId(url: string) {
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
@@ -208,7 +212,7 @@
             onclick={() => modelDropdownOpen = !modelDropdownOpen}
             class="w-full px-4 py-2.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-left text-red-50 hover:border-red-500/50 transition-all flex items-center justify-between focus:outline-none focus:border-red-500"
           >
-            <span>{selectedModel || 'Seleccionar modelo'}</span>
+            <span>{selectedModel || (availableModels.length > 0 ? 'Seleccionar modelo' : 'No hay modelos descargados')}</span>
             <svg class="w-5 h-5 text-red-400 transition-transform {modelDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
@@ -216,25 +220,31 @@
           
           {#if modelDropdownOpen}
             <div class="absolute top-full left-0 right-0 mt-2 border-2 border-red-500/50 rounded-lg shadow-2xl z-[100]" style="background-color: #1e293b;">
-              {#each models as model}
-                <button
-                  onclick={() => {
-                    selectedModel = model;
-                    modelDropdownOpen = false;
-                  }}
-                  class="w-full px-4 py-3 text-left text-red-100 transition-colors flex items-center justify-between first:rounded-t-lg last:rounded-b-lg"
-                  style="background-color: #1e293b;"
-                  onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#991b1b30'}
-                  onmouseleave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
-                >
-                  <span class="font-medium text-base">{model}</span>
-                  {#if selectedModel === model}
-                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                  {/if}
-                </button>
-              {/each}
+              {#if availableModels.length === 0}
+                <div class="px-4 py-3 text-red-300 text-sm">
+                  No hay modelos descargados. Ve a la pestaña Modelos para descargar uno.
+                </div>
+              {:else}
+                {#each availableModels as model}
+                  <button
+                    onclick={() => {
+                      selectedModel = model.name;
+                      modelDropdownOpen = false;
+                    }}
+                    class="w-full px-4 py-3 text-left text-red-100 transition-colors flex items-center justify-between first:rounded-t-lg last:rounded-b-lg"
+                    style="background-color: #1e293b;"
+                    onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#991b1b30'}
+                    onmouseleave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
+                  >
+                    <span class="font-medium text-base">{model.name}</span>
+                    {#if selectedModel === model.name}
+                      <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    {/if}
+                  </button>
+                {/each}
+              {/if}
             </div>
           {/if}
         </div>

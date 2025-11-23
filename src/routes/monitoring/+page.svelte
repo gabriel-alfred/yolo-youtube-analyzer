@@ -1,14 +1,21 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
   import ErrorMessage from '$lib/components/ui/ErrorMessage.svelte';
   import ConfirmationDialog from '$lib/components/ui/ConfirmationDialog.svelte';
+  import { 
+    DEFAULT_MODELS, 
+    getDownloadedModels, 
+    mergeModelsWithDownloads, 
+    type Model 
+  } from '$lib/models';
   
   // State
   let streamUrl = $state('');
-  let selectedModel = $state('yolov11n');
+  let selectedModel = $state('');
   let selectedQuality = $state('medium');
   let confidenceThreshold = $state(0.5);
   let selectedClasses = $state<string[]>([
@@ -24,14 +31,16 @@
   let showStopDialog = $state(false);
   let showPreview = $state(false);
   
-  // Configuration
-  const models = [
-    { id: 'yolov11n', name: 'YOLOv11 Nano', speed: 'Muy rápido', accuracy: 'Media' },
-    { id: 'yolov11s', name: 'YOLOv11 Small', speed: 'Rápido', accuracy: 'Buena' },
-    { id: 'yolov11m', name: 'YOLOv11 Medium', speed: 'Moderado', accuracy: 'Muy buena' },
-    { id: 'yolov11l', name: 'YOLOv11 Large', speed: 'Lento', accuracy: 'Excelente' },
-    { id: 'yolov11x', name: 'YOLOv11 XLarge', speed: 'Muy lento', accuracy: 'Superior' }
-  ];
+  let models = $state<Model[]>([]);
+  let availableModels = $derived(models.filter(m => m.downloaded));
+
+  onMount(async () => {
+    const downloadedFiles = await getDownloadedModels();
+    models = mergeModelsWithDownloads(DEFAULT_MODELS, downloadedFiles);
+    if (availableModels.length > 0 && !selectedModel) {
+      selectedModel = availableModels[0].id;
+    }
+  });
   
   const qualities = [
     { id: 'low', name: 'Baja (360p)', fps: '15 FPS' },
@@ -306,29 +315,35 @@
         {/snippet}
         
         <div class="space-y-2">
-          {#each models as model}
-            <button
-              onclick={() => selectedModel = model.id}
-              disabled={isStreaming}
-              class="w-full p-2.5 rounded-lg border transition-all text-left {
-                selectedModel === model.id 
-                  ? 'bg-red-500/20 border-red-500/50 shadow-lg shadow-red-500/20' 
-                  : 'bg-slate-800/50 border-red-500/20 hover:border-red-500/40'
-              } disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-semibold text-red-100">{model.name}</p>
-                  <p class="text-xs text-red-100/60">{model.speed} • {model.accuracy}</p>
+          {#if availableModels.length === 0}
+            <div class="p-4 text-center text-red-300/60 text-sm bg-slate-800/30 rounded-lg border border-red-500/10">
+              No hay modelos descargados. Ve a la pestaña Modelos para descargar uno.
+            </div>
+          {:else}
+            {#each availableModels as model}
+              <button
+                onclick={() => selectedModel = model.id}
+                disabled={isStreaming}
+                class="w-full p-2.5 rounded-lg border transition-all text-left {
+                  selectedModel === model.id 
+                    ? 'bg-red-500/20 border-red-500/50 shadow-lg shadow-red-500/20' 
+                    : 'bg-slate-800/50 border-red-500/20 hover:border-red-500/40'
+                } disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-semibold text-red-100">{model.name}</p>
+                    <p class="text-xs text-red-100/60">{model.speed} • {model.precision}</p>
+                  </div>
+                  {#if selectedModel === model.id}
+                    <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  {/if}
                 </div>
-                {#if selectedModel === model.id}
-                  <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                  </svg>
-                {/if}
-              </div>
-            </button>
-          {/each}
+              </button>
+            {/each}
+          {/if}
         </div>
       </Card>
       

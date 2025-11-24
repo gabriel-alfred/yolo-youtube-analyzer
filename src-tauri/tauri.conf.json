@@ -18,7 +18,21 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      },
+      "capabilities": [
+        "default"
+      ]
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": "^.*$"
     }
   },
   "bundle": {

@@ -7,7 +7,20 @@
   ],
   "permissions": [
     "core:default",
+    "core:path:default",
+    "core:event:default",
     "opener:default",
-    "dialog:default"
+    "dialog:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "python",
+          "cmd": "python",
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-open"
   ]
 }

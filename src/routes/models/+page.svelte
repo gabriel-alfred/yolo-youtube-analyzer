@@ -1,25 +1,95 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
-  import { listen } from '@tauri-apps/api/event';
-  import { open } from '@tauri-apps/plugin-dialog';
-  import Button from '$lib/components/ui/Button.svelte';
-  import Card from '$lib/components/ui/Card.svelte';
-  import ConfirmationDialog from '$lib/components/ui/ConfirmationDialog.svelte';
-  import ErrorMessage from '$lib/components/ui/ErrorMessage.svelte';
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { open } from "@tauri-apps/plugin-dialog";
+  import Button from "$lib/components/ui/Button.svelte";
+  import Card from "$lib/components/ui/Card.svelte";
+  import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
+  import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
 
   // Clases COCO
   const COCO_CLASSES = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
-    'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
-    'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
-    'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
-    'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-    'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
-    'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
   ];
 
   interface Model {
@@ -39,75 +109,91 @@
   }
 
   // URLs reales de modelos YOLO v11 desde GitHub releases de Ultralytics
-  const YOLO_MODELS_BASE_URL = 'https://github.com/ultralytics/assets/releases/download/v8.3.0';
+  const YOLO_MODELS_BASE_URL =
+    "https://github.com/ultralytics/assets/releases/download/v8.3.0";
 
   // Modelos base de YOLO con URLs reales
   let models = $state<Model[]>([
     {
-      id: '1',
-      name: 'YOLOv11n',
-      fileName: 'yolo11n.pt',
+      id: "1",
+      name: "YOLOv11n",
+      fileName: "yolo11n.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11n.pt`,
-      size: '2.6 MB',
-      speed: 'Muy rápida',
-      precision: '~39% mAP',
+      size: "2.6 MB",
+      speed: "Muy rápida",
+      precision: "~39% mAP",
       downloaded: false,
       active: false,
       isCustom: false,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
     },
     {
-      id: '2',
-      name: 'YOLOv11s',
-      fileName: 'yolo11s.pt',
+      id: "2",
+      name: "YOLOv11s",
+      fileName: "yolo11s.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11s.pt`,
-      size: '9.4 MB',
-      speed: 'Rápida',
-      precision: '~47% mAP',
+      size: "9.4 MB",
+      speed: "Rápida",
+      precision: "~47% mAP",
       downloaded: false,
       active: false,
       isCustom: false,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
     },
     {
-      id: '3',
-      name: 'YOLOv11m',
-      fileName: 'yolo11m.pt',
+      id: "3",
+      name: "YOLOv11m",
+      fileName: "yolo11m.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11m.pt`,
-      size: '20.1 MB',
-      speed: 'Media',
-      precision: '~51% mAP',
+      size: "20.1 MB",
+      speed: "Media",
+      precision: "~51% mAP",
       downloaded: false,
       active: false,
       isCustom: false,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
     },
     {
-      id: '4',
-      name: 'YOLOv11l',
-      fileName: 'yolo11l.pt',
+      id: "4",
+      name: "YOLOv11l",
+      fileName: "yolo11l.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11l.pt`,
-      size: '25.3 MB',
-      speed: 'Lenta',
-      precision: '~53% mAP',
+      size: "25.3 MB",
+      speed: "Lenta",
+      precision: "~53% mAP",
       downloaded: false,
       active: false,
       isCustom: false,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
     },
     {
-      id: '5',
-      name: 'YOLOv11x',
-      fileName: 'yolo11x.pt',
+      id: "5",
+      name: "YOLOv11x",
+      fileName: "yolo11x.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11x.pt`,
-      size: '56.9 MB',
-      speed: 'Muy lenta',
-      precision: '~54% mAP',
+      size: "56.9 MB",
+      speed: "Muy lenta",
+      precision: "~54% mAP",
       downloaded: false,
       active: false,
       isCustom: false,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
-    }
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
+    },
   ]);
 
   let classModalOpen = $state(false);
@@ -115,18 +201,23 @@
   let deleteDialogOpen = $state(false);
   let modelToDelete = $state<Model | null>(null);
   let isDragging = $state(false);
-  let dragError = $state('');
-  let downloadError = $state('');
-  let modelsDir = $state('');
+  let dragError = $state("");
+  let downloadError = $state("");
+  let modelsDir = $state("");
 
   // Verificar modelos descargados al cargar
   onMount(async () => {
     await loadDownloadedModels();
-    
+
     // Escuchar eventos de progreso de descarga
-    const unlisten = await listen<{model_id: string, downloaded: number, total: number, percentage: number}>('download-progress', (event) => {
+    const unlisten = await listen<{
+      model_id: string;
+      downloaded: number;
+      total: number;
+      percentage: number;
+    }>("download-progress", (event) => {
       const { model_id, percentage } = event.payload;
-      const model = models.find(m => m.id === model_id);
+      const model = models.find((m) => m.id === model_id);
       if (model) {
         model.downloadProgress = Math.round(percentage);
       }
@@ -134,10 +225,10 @@
 
     // Obtener directorio de modelos
     try {
-      modelsDir = await invoke<string>('get_models_dir');
-      console.log('Directorio de modelos:', modelsDir);
+      modelsDir = await invoke<string>("get_models_dir");
+      console.log("Directorio de modelos:", modelsDir);
     } catch (error) {
-      console.error('Error obteniendo directorio:', error);
+      console.error("Error obteniendo directorio:", error);
     }
 
     return () => {
@@ -147,23 +238,23 @@
 
   async function loadDownloadedModels() {
     try {
-      const downloadedFiles = await invoke<string[]>('list_downloaded_models');
-      
-      models.forEach(model => {
+      const downloadedFiles = await invoke<string[]>("list_downloaded_models");
+
+      models.forEach((model) => {
         model.downloaded = downloadedFiles.includes(model.fileName);
       });
-      
-      console.log('Modelos descargados:', downloadedFiles);
+
+      console.log("Modelos descargados:", downloadedFiles);
     } catch (error) {
-      console.error('Error verificando modelos:', error);
+      console.error("Error verificando modelos:", error);
     }
   }
 
   function toggleActive(modelId: string) {
-    const model = models.find(m => m.id === modelId);
+    const model = models.find((m) => m.id === modelId);
     if (model && model.downloaded) {
       // Desactivar todos los demás modelos
-      models.forEach(m => {
+      models.forEach((m) => {
         if (m.id !== modelId) {
           m.active = false;
         }
@@ -179,45 +270,48 @@
 
   function toggleClass(className: string) {
     if (currentModelForClasses) {
-      currentModelForClasses.selectedClasses[className] = !currentModelForClasses.selectedClasses[className];
+      currentModelForClasses.selectedClasses[className] =
+        !currentModelForClasses.selectedClasses[className];
     }
   }
 
   function toggleAllClasses() {
     if (currentModelForClasses) {
-      const allSelected = Object.values(currentModelForClasses.selectedClasses).every(v => v);
-      COCO_CLASSES.forEach(cls => {
+      const allSelected = Object.values(
+        currentModelForClasses.selectedClasses,
+      ).every((v) => v);
+      COCO_CLASSES.forEach((cls) => {
         currentModelForClasses!.selectedClasses[cls] = !allSelected;
       });
     }
   }
 
   function getSelectedClassesCount(model: Model): number {
-    return Object.values(model.selectedClasses).filter(v => v).length;
+    return Object.values(model.selectedClasses).filter((v) => v).length;
   }
 
   async function downloadModel(modelId: string) {
-    const model = models.find(m => m.id === modelId);
+    const model = models.find((m) => m.id === modelId);
     if (!model) return;
 
     model.downloading = true;
     model.downloadProgress = 0;
-    downloadError = '';
+    downloadError = "";
 
     try {
-      await invoke('download_model', {
+      await invoke("download_model", {
         modelId: model.id,
         fileName: model.fileName,
-        url: model.downloadUrl
+        url: model.downloadUrl,
       });
-      
+
       model.downloading = false;
       model.downloaded = true;
       model.downloadProgress = undefined;
-      
+
       console.log(`Modelo ${model.name} descargado exitosamente`);
     } catch (error) {
-      console.error('Error descargando modelo:', error);
+      console.error("Error descargando modelo:", error);
       downloadError = `Error descargando ${model.name}: ${error}`;
       model.downloading = false;
       model.downloadProgress = undefined;
@@ -235,24 +329,24 @@
     if (modelToDelete.isCustom) {
       // Eliminar modelo personalizado del sistema de archivos y de la lista
       try {
-        await invoke('delete_model', { fileName: modelToDelete.fileName });
-        models = models.filter(m => m.id !== modelToDelete.id);
+        await invoke("delete_model", { fileName: modelToDelete.fileName });
+        models = models.filter((m) => m.id !== modelToDelete.id);
       } catch (error) {
-        console.error('Error eliminando modelo personalizado:', error);
+        console.error("Error eliminando modelo personalizado:", error);
         downloadError = `Error eliminando modelo: ${error}`;
       }
     } else {
       // Eliminar modelo preconfigurado solo del disco
       try {
-        await invoke('delete_model', { fileName: modelToDelete.fileName });
+        await invoke("delete_model", { fileName: modelToDelete.fileName });
         modelToDelete.downloaded = false;
         modelToDelete.active = false;
       } catch (error) {
-        console.error('Error eliminando modelo:', error);
+        console.error("Error eliminando modelo:", error);
         downloadError = `Error eliminando modelo: ${error}`;
       }
     }
-    
+
     modelToDelete = null;
   }
 
@@ -260,58 +354,65 @@
     try {
       const selected = await open({
         multiple: false,
-        filters: [{
-          name: 'YOLO Models',
-          extensions: ['pt']
-        }]
+        filters: [
+          {
+            name: "YOLO Models",
+            extensions: ["pt"],
+          },
+        ],
       });
 
-      if (selected && typeof selected === 'string') {
+      if (selected && typeof selected === "string") {
         // Importar el modelo usando el backend
-        const fileName = await invoke<string>('import_model', { filePath: selected });
-        
+        const fileName = await invoke<string>("import_model", {
+          filePath: selected,
+        });
+
         // Verificar si ya existe en la lista
-        if (models.some(m => m.fileName === fileName)) {
-          dragError = 'El modelo ya está en la lista';
+        if (models.some((m) => m.fileName === fileName)) {
+          dragError = "El modelo ya está en la lista";
           return;
         }
 
         // Obtener tamaño del archivo
-        let sizeStr = 'Desconocido';
+        let sizeStr = "Desconocido";
         try {
-          const size = await invoke<number>('get_file_size', { fileName });
+          const size = await invoke<number>("get_file_size", { fileName });
           sizeStr = formatBytes(size);
         } catch (e) {
-          console.error('Error obteniendo tamaño:', e);
+          console.error("Error obteniendo tamaño:", e);
         }
 
         const newModel: Model = {
           id: Date.now().toString(),
-          name: fileName.replace(/\.pt$/, ''),
+          name: fileName.replace(/\.pt$/, ""),
           fileName: fileName,
-          downloadUrl: '',
+          downloadUrl: "",
           size: sizeStr,
-          speed: 'Desconocida',
-          precision: 'Por determinar',
+          speed: "Desconocida",
+          precision: "Por determinar",
           downloaded: true,
           active: false,
           isCustom: true,
-          selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+          selectedClasses: COCO_CLASSES.reduce(
+            (acc, cls) => ({ ...acc, [cls]: true }),
+            {},
+          ),
         };
 
         models = [...models, newModel];
-        dragError = '';
+        dragError = "";
       }
     } catch (err) {
-      console.error('Error seleccionando archivo:', err);
-      dragError = 'Error al seleccionar archivo: ' + err;
+      console.error("Error seleccionando archivo:", err);
+      dragError = "Error al seleccionar archivo: " + err;
     }
   }
 
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
     isDragging = true;
-    dragError = '';
+    dragError = "";
   }
 
   function handleDragLeave(e: DragEvent) {
@@ -322,29 +423,29 @@
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     isDragging = false;
-    dragError = '';
+    dragError = "";
 
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) {
-      dragError = 'No se detectaron archivos';
+      dragError = "No se detectaron archivos";
       return;
     }
 
     const file = files[0];
-    
+
     // Restricción estricta a .pt como solicitó el usuario
-    if (!file.name.endsWith('.pt')) {
-      dragError = 'Solo se aceptan archivos .pt';
+    if (!file.name.endsWith(".pt")) {
+      dragError = "Solo se aceptan archivos .pt";
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      dragError = 'El archivo es demasiado grande (máx. 100MB)';
+      dragError = "El archivo es demasiado grande (máx. 100MB)";
       return;
     }
 
-    if (models.some(m => m.fileName === file.name)) {
-      dragError = 'Ya existe un modelo con ese nombre';
+    if (models.some((m) => m.fileName === file.name)) {
+      dragError = "Ya existe un modelo con ese nombre";
       return;
     }
 
@@ -352,36 +453,41 @@
     // En Tauri v2, podríamos necesitar manejar esto diferente si queremos copiar el archivo.
     // Por ahora, mantenemos la lógica visual pero advertimos que use el selector si falla.
     // Idealmente, el usuario debería usar el selector de archivos para una importación correcta.
-    
+
     const newModel: Model = {
       id: Date.now().toString(),
-      name: file.name.replace(/\.pt$/, ''),
+      name: file.name.replace(/\.pt$/, ""),
       fileName: file.name,
-      downloadUrl: '',
+      downloadUrl: "",
       size: formatBytes(file.size),
-      speed: 'Desconocida',
-      precision: 'Por determinar',
+      speed: "Desconocida",
+      precision: "Por determinar",
       downloaded: true,
       active: false,
       isCustom: true,
-      selectedClasses: COCO_CLASSES.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+      selectedClasses: COCO_CLASSES.reduce(
+        (acc, cls) => ({ ...acc, [cls]: true }),
+        {},
+      ),
     };
 
     models = [...models, newModel];
   }
 
   function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   }
 </script>
 
 <!-- Header -->
 <div class="text-center mb-12">
-  <h1 class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4">
+  <h1
+    class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
+  >
     Gestión de Modelos
   </h1>
   <p class="text-slate-300 text-lg">
@@ -389,7 +495,9 @@
   </p>
   {#if modelsDir}
     <p class="text-slate-400 text-sm mt-2">
-      Ubicación: <code class="bg-slate-800/50 px-2 py-1 rounded text-xs">{modelsDir}</code>
+      Ubicación: <code class="bg-slate-800/50 px-2 py-1 rounded text-xs"
+        >{modelsDir}</code
+      >
     </p>
   {/if}
 </div>
@@ -400,7 +508,7 @@
       variant="error"
       message={downloadError}
       dismissible={true}
-      onDismiss={() => downloadError = ''}
+      onDismiss={() => (downloadError = "")}
     />
   </div>
 {/if}
@@ -409,9 +517,21 @@
   <!-- Models Table - Desktop View -->
   <Card variant="default" padding="none" class="hidden lg:block">
     {#snippet header()}
-      <h2 class="text-xl font-bold text-red-100 flex items-center gap-2 px-6 py-4">
-        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+      <h2
+        class="text-xl font-bold text-red-100 flex items-center gap-2 px-6 py-4"
+      >
+        <svg
+          class="w-6 h-6 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+          />
         </svg>
         Modelos Disponibles
       </h2>
@@ -421,13 +541,34 @@
       <table class="w-full">
         <thead class="bg-slate-900/50 border-y border-red-500/20">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Estado</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Modelo</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Tamaño</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Velocidad</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Precisión</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Clases</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider">Acciones</th>
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Estado</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Modelo</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Tamaño</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Velocidad</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Precisión</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Clases</th
+            >
+            <th
+              class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
+              >Acciones</th
+            >
           </tr>
         </thead>
         <tbody class="divide-y divide-red-500/10">
@@ -444,14 +585,20 @@
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-semibold text-red-100">{model.name}</span>
+                  <span class="text-sm font-semibold text-red-100"
+                    >{model.name}</span
+                  >
                   {#if model.active}
-                    <span class="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+                    <span
+                      class="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded-full border border-green-500/30"
+                    >
                       Activo
                     </span>
                   {/if}
                   {#if model.isCustom}
-                    <span class="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                    <span
+                      class="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30"
+                    >
                       Personalizado
                     </span>
                   {/if}
@@ -472,19 +619,37 @@
                   disabled={!model.downloaded}
                   class="px-3 py-1.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-sm text-red-100 hover:border-red-500/50 transition-all flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                    />
                   </svg>
-                  <span>{getSelectedClassesCount(model)}/{COCO_CLASSES.length}</span>
+                  <span
+                    >{getSelectedClassesCount(
+                      model,
+                    )}/{COCO_CLASSES.length}</span
+                  >
                 </button>
               </td>
               <td class="px-6 py-4">
                 {#if model.downloading}
                   <div class="w-32">
                     <div class="flex items-center gap-2 mb-1">
-                      <span class="text-xs text-red-300">{model.downloadProgress}%</span>
+                      <span class="text-xs text-red-300"
+                        >{model.downloadProgress}%</span
+                      >
                     </div>
-                    <div class="w-full h-2 bg-slate-900/60 rounded-full overflow-hidden border border-red-500/30">
+                    <div
+                      class="w-full h-2 bg-slate-900/60 rounded-full overflow-hidden border border-red-500/30"
+                    >
                       <div
                         class="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-300"
                         style="width: {model.downloadProgress}%"
@@ -498,8 +663,18 @@
                     onclick={() => openDeleteDialog(model)}
                   >
                     {#snippet icon()}
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                     {/snippet}
                     Eliminar
@@ -511,8 +686,18 @@
                     onclick={() => downloadModel(model.id)}
                   >
                     {#snippet icon()}
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
                       </svg>
                     {/snippet}
                     Descargar
@@ -530,8 +715,18 @@
   <div class="lg:hidden space-y-4">
     <div class="flex items-center justify-between px-4">
       <h2 class="text-xl font-bold text-red-100 flex items-center gap-2">
-        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+        <svg
+          class="w-6 h-6 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+          />
         </svg>
         Modelos Disponibles
       </h2>
@@ -544,7 +739,9 @@
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-2">
-                <h3 class="text-lg font-bold text-red-100 truncate">{model.name}</h3>
+                <h3 class="text-lg font-bold text-red-100 truncate">
+                  {model.name}
+                </h3>
                 <input
                   type="checkbox"
                   checked={model.active}
@@ -555,12 +752,16 @@
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 {#if model.active}
-                  <span class="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+                  <span
+                    class="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded-full border border-green-500/30"
+                  >
                     Activo
                   </span>
                 {/if}
                 {#if model.isCustom}
-                  <span class="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                  <span
+                    class="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30"
+                  >
                     Personalizado
                   </span>
                 {/if}
@@ -584,7 +785,9 @@
             </div>
             <div>
               <span class="text-red-300/70 text-xs">Clases</span>
-              <p class="text-red-100 font-medium">{getSelectedClassesCount(model)}/{COCO_CLASSES.length}</p>
+              <p class="text-red-100 font-medium">
+                {getSelectedClassesCount(model)}/{COCO_CLASSES.length}
+              </p>
             </div>
           </div>
 
@@ -594,9 +797,13 @@
               <div class="w-full">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs text-red-300">Descargando...</span>
-                  <span class="text-xs text-red-300 font-medium">{model.downloadProgress}%</span>
+                  <span class="text-xs text-red-300 font-medium"
+                    >{model.downloadProgress}%</span
+                  >
                 </div>
-                <div class="w-full h-2 bg-slate-900/60 rounded-full overflow-hidden border border-red-500/30">
+                <div
+                  class="w-full h-2 bg-slate-900/60 rounded-full overflow-hidden border border-red-500/30"
+                >
                   <div
                     class="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-300"
                     style="width: {model.downloadProgress}%"
@@ -608,8 +815,18 @@
                 onclick={() => openClassModal(model)}
                 class="flex-1 px-4 py-2.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-sm text-red-100 hover:border-red-500/50 transition-all flex items-center justify-center gap-2"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                  />
                 </svg>
                 Configurar Clases
               </button>
@@ -620,8 +837,18 @@
                 class="sm:w-auto"
               >
                 {#snippet icon()}
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                 {/snippet}
                 Eliminar
@@ -634,8 +861,18 @@
                 class="w-full"
               >
                 {#snippet icon()}
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
                   </svg>
                 {/snippet}
                 Descargar Modelo
@@ -651,8 +888,18 @@
   <Card variant="default" padding="lg">
     {#snippet header()}
       <h2 class="text-xl font-bold text-red-100 flex items-center gap-2">
-        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <svg
+          class="w-6 h-6 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
         </svg>
         Agregar Modelo Personalizado
       </h2>
@@ -661,28 +908,44 @@
     <div
       role="button"
       tabindex="0"
-      class="border-2 border-dashed rounded-xl p-12 transition-all duration-300 cursor-pointer {isDragging ? 'border-red-500 bg-red-500/10' : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'}"
+      class="border-2 border-dashed rounded-xl p-12 transition-all duration-300 cursor-pointer {isDragging
+        ? 'border-red-500 bg-red-500/10'
+        : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'}"
       ondragover={handleDragOver}
       ondragleave={handleDragLeave}
       ondrop={handleDrop}
       onclick={handleFileSelect}
       onkeydown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleFileSelect();
         }
       }}
     >
       <div class="flex flex-col items-center justify-center gap-4 text-center">
-        <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-          <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <div
+          class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center"
+        >
+          <svg
+            class="w-8 h-8 text-red-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
           </svg>
         </div>
-        
+
         <div>
           <h3 class="text-lg font-semibold text-red-100 mb-2">
-            {isDragging ? 'Suelta el archivo aquí' : 'Haz clic o arrastra tu modelo aquí'}
+            {isDragging
+              ? "Suelta el archivo aquí"
+              : "Haz clic o arrastra tu modelo aquí"}
           </h3>
           <p class="text-sm text-red-300/70">
             Formatos aceptados: .pt (máx. 100MB)
@@ -694,7 +957,7 @@
             variant="error"
             message={dragError}
             dismissible={true}
-            onDismiss={() => dragError = ''}
+            onDismiss={() => (dragError = "")}
             class="max-w-md"
           />
         {/if}
@@ -706,37 +969,89 @@
   <Card variant="gradient" padding="lg">
     {#snippet header()}
       <h2 class="text-xl font-bold text-red-100 flex items-center gap-2">
-        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="w-6 h-6 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         Información
       </h2>
     {/snippet}
-    
+
     <div class="grid sm:grid-cols-2 gap-4 text-sm text-red-200/80">
       <div class="flex items-start gap-2">
-        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         <p>Activa los modelos que desees usar para el análisis de video</p>
       </div>
       <div class="flex items-start gap-2">
-        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         <p>Los modelos más pequeños son más rápidos pero menos precisos</p>
       </div>
       <div class="flex items-start gap-2">
-        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         <p>Configura las clases específicas que cada modelo debe detectar</p>
       </div>
       <div class="flex items-start gap-2">
-        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
-        <p>Puedes agregar modelos personalizados arrastrándolos al área indicada</p>
+        <p>
+          Puedes agregar modelos personalizados arrastrándolos al área indicada
+        </p>
       </div>
     </div>
   </Card>
@@ -748,18 +1063,34 @@
     <!-- Backdrop -->
     <button
       class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-      onclick={() => classModalOpen = false}
+      onclick={() => (classModalOpen = false)}
       aria-label="Cerrar modal"
     ></button>
 
     <!-- Modal -->
-    <div class="relative bg-slate-900 border-2 border-red-500/50 rounded-xl shadow-2xl shadow-red-500/20 w-full max-w-3xl max-h-[80vh] flex flex-col">
+    <div
+      class="relative bg-slate-900 border-2 border-red-500/50 rounded-xl shadow-2xl shadow-red-500/20 w-full max-w-3xl max-h-[80vh] flex flex-col"
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-red-500/20">
+      <div
+        class="flex items-center justify-between p-6 border-b border-red-500/20"
+      >
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          <div
+            class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center"
+          >
+            <svg
+              class="w-5 h-5 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+              />
             </svg>
           </div>
           <div>
@@ -768,54 +1099,92 @@
           </div>
         </div>
         <button
-          onclick={() => classModalOpen = false}
+          onclick={() => (classModalOpen = false)}
           class="w-10 h-10 rounded-lg hover:bg-red-500/10 transition-colors flex items-center justify-center text-red-300 hover:text-red-100"
           aria-label="Cerrar modal de selección de clases"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <div class="sticky top-0 bg-slate-900 px-6 pt-4 pb-3 border-b border-red-500/20 z-10">
+        <div
+          class="sticky top-0 bg-slate-900 px-6 pt-4 pb-3 border-b border-red-500/20 z-10"
+        >
           <div class="flex items-center justify-between gap-4">
             <div class="text-sm text-red-300">
-              <span class="font-semibold text-red-100">{getSelectedClassesCount(currentModelForClasses)}</span> de <span class="font-medium">{COCO_CLASSES.length}</span> seleccionadas
+              <span class="font-semibold text-red-100"
+                >{getSelectedClassesCount(currentModelForClasses)}</span
+              >
+              de <span class="font-medium">{COCO_CLASSES.length}</span> seleccionadas
             </div>
             <Button variant="ghost" size="sm" onclick={toggleAllClasses}>
-              {Object.values(currentModelForClasses.selectedClasses).every(v => v) ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+              {Object.values(currentModelForClasses.selectedClasses).every(
+                (v) => v,
+              )
+                ? "Deseleccionar Todo"
+                : "Seleccionar Todo"}
             </Button>
           </div>
         </div>
 
         <div class="px-6 py-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {#each COCO_CLASSES as className}
-            <label class="flex items-center gap-3 p-3 bg-slate-800/40 border border-red-500/20 rounded-lg hover:border-red-500/40 hover:bg-slate-800/60 transition-all cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={currentModelForClasses.selectedClasses[className]}
-                onchange={() => toggleClass(className)}
-                class="w-5 h-5 rounded border-red-500/30 text-red-500 focus:ring-red-500/50 bg-slate-800 cursor-pointer flex-shrink-0"
-              />
-              <span class="flex-1 text-sm font-medium {currentModelForClasses.selectedClasses[className] ? 'text-red-100' : 'text-red-300/50'} group-hover:text-red-100 transition-colors">
-                {className}
-              </span>
-            </label>
-          {/each}
+            {#each COCO_CLASSES as className}
+              <label
+                class="flex items-center gap-3 p-3 bg-slate-800/40 border border-red-500/20 rounded-lg hover:border-red-500/40 hover:bg-slate-800/60 transition-all cursor-pointer group"
+              >
+                <input
+                  type="checkbox"
+                  checked={currentModelForClasses.selectedClasses[className]}
+                  onchange={() => toggleClass(className)}
+                  class="w-5 h-5 rounded border-red-500/30 text-red-500 focus:ring-red-500/50 bg-slate-800 cursor-pointer flex-shrink-0"
+                />
+                <span
+                  class="flex-1 text-sm font-medium {currentModelForClasses
+                    .selectedClasses[className]
+                    ? 'text-red-100'
+                    : 'text-red-300/50'} group-hover:text-red-100 transition-colors"
+                >
+                  {className}
+                </span>
+              </label>
+            {/each}
           </div>
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-red-500/20 bg-slate-900/50">
-        <Button variant="primary" onclick={() => classModalOpen = false}>
+      <div
+        class="flex items-center justify-end gap-3 p-6 border-t border-red-500/20 bg-slate-900/50"
+      >
+        <Button variant="primary" onclick={() => (classModalOpen = false)}>
           {#snippet icon()}
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           {/snippet}
           Guardar
@@ -830,7 +1199,9 @@
   bind:open={deleteDialogOpen}
   variant="danger"
   title="¿Eliminar modelo?"
-  message="Esta acción eliminará el modelo {modelToDelete?.name} de tu sistema. {modelToDelete?.isCustom ? 'El modelo personalizado se eliminará permanentemente.' : 'Podrás descargarlo nuevamente si lo necesitas en el futuro.'}"
+  message="Esta acción eliminará el modelo {modelToDelete?.name} de tu sistema. {modelToDelete?.isCustom
+    ? 'El modelo personalizado se eliminará permanentemente.'
+    : 'Podrás descargarlo nuevamente si lo necesitas en el futuro.'}"
   confirmText="Eliminar"
   cancelText="Cancelar"
   onConfirm={confirmDelete}
@@ -840,17 +1211,17 @@
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
   }
-  
+
   .custom-scrollbar::-webkit-scrollbar-track {
     background: rgba(15, 23, 42, 0.5);
     border-radius: 4px;
   }
-  
+
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(239, 68, 68, 0.3);
     border-radius: 4px;
   }
-  
+
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(239, 68, 68, 0.5);
   }

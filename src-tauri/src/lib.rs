@@ -1,5 +1,7 @@
 use tauri::Manager;
 use tauri::Emitter;
+use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandEvent;
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -66,7 +68,6 @@ fn resolve_models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         return Ok(path);
     }
 
-    // Default to Documents/YoloModels if available, otherwise AppData/models
     let default_path = if let Ok(docs_dir) = app.path().document_dir() {
         docs_dir.join("YoloModels")
     } else {
@@ -83,6 +84,82 @@ fn resolve_models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(default_path)
 }
 
+// Función para encontrar Python en el sistema
+fn find_python_executable() -> Result<String, String> {
+    // En Windows, intenta estas ubicaciones comunes
+    if cfg!(windows) {
+        let common_paths = vec![
+            r"C:\Python310\python.exe",
+            r"C:\Python311\python.exe",
+            r"C:\Python312\python.exe",
+            r"C:\Program Files\Python310\python.exe",
+            r"C:\Program Files\Python311\python.exe",
+            r"C:\Program Files\Python312\python.exe",
+            r"C:\Users\*\AppData\Local\Programs\Python\Python310\python.exe",
+            r"C:\Users\*\AppData\Local\Programs\Python\Python311\python.exe",
+            r"C:\Users\*\AppData\Local\Programs\Python\Python312\python.exe",
+        ];
+        
+        for path_str in common_paths {
+            // Expande * con el username si es necesario
+            let path = if path_str.contains("*") {
+                if let Ok(output) = std::process::Command::new("whoami")
+                    .output() {
+                    let username = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    PathBuf::from(path_str.replace("*", &username))
+                } else {
+                    PathBuf::from(path_str)
+                }
+            } else {
+                PathBuf::from(path_str)
+            };
+            
+            if path.exists() {
+                return Ok(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    
+    // Intenta usar py launcher (Windows)
+    if cfg!(windows) {
+        if let Ok(output) = std::process::Command::new("py")
+            .arg("-c")
+            .arg("import sys; print(sys.executable)")
+            .output() 
+        {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() && PathBuf::from(&path).exists() {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+    
+    // Intenta which/where en PATH
+    let python_names = if cfg!(windows) {
+        vec!["python.exe", "python3.exe", "python"]
+    } else {
+        vec!["python3", "python"]
+    };
+
+    for python_name in python_names {
+        if let Ok(output) = std::process::Command::new(if cfg!(windows) { "where" } else { "which" })
+            .arg(python_name)
+            .output()
+        {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().lines().next().unwrap_or("").to_string();
+                if !path.is_empty() {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+
+    Err("Python no encontrado en el sistema".to_string())
+}
+
 #[tauri::command]
 fn get_current_models_dir(app: tauri::AppHandle) -> Result<String, String> {
     let path = resolve_models_dir(&app)?;
@@ -97,14 +174,12 @@ fn set_models_dir(app: tauri::AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
-// Comando para obtener el directorio de modelos (usado internamente o por frontend)
 #[tauri::command]
 fn get_models_dir(app: tauri::AppHandle) -> Result<String, String> {
     let models_dir = resolve_models_dir(&app)?;
     Ok(models_dir.to_string_lossy().to_string())
 }
 
-// Comando para listar modelos descargados
 #[tauri::command]
 fn list_downloaded_models(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let models_dir = resolve_models_dir(&app)?;
@@ -124,7 +199,6 @@ fn list_downloaded_models(app: tauri::AppHandle) -> Result<Vec<String>, String> 
     Ok(models)
 }
 
-// Comando para verificar si un modelo existe
 #[tauri::command]
 fn check_model_exists(app: tauri::AppHandle, file_name: String) -> Result<bool, String> {
     let models_dir = resolve_models_dir(&app)?;
@@ -132,7 +206,6 @@ fn check_model_exists(app: tauri::AppHandle, file_name: String) -> Result<bool, 
     Ok(model_path.exists())
 }
 
-// Comando para descargar un modelo
 #[tauri::command]
 async fn download_model(
     app: tauri::AppHandle,
@@ -144,9 +217,8 @@ async fn download_model(
     let models_dir = resolve_models_dir(&app)?;
     let file_path = models_dir.join(&file_name);
     
-    // Usar reqwest para descargar
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(600)) // 10 minutos
+        .timeout(std::time::Duration::from_secs(600))
         .build()
         .map_err(|e| e.to_string())?;
     
@@ -185,7 +257,6 @@ async fn download_model(
             0.0
         };
         
-        // Emitir progreso
         let progress = DownloadProgress {
             model_id: model_id.clone(),
             downloaded,
@@ -199,7 +270,6 @@ async fn download_model(
     Ok(file_path.to_string_lossy().to_string())
 }
 
-// Comando para eliminar un modelo
 #[tauri::command]
 fn delete_model(app: tauri::AppHandle, file_name: String) -> Result<(), String> {
     let models_dir = resolve_models_dir(&app)?;
@@ -212,7 +282,6 @@ fn delete_model(app: tauri::AppHandle, file_name: String) -> Result<(), String> 
     Ok(())
 }
 
-// Comando para obtener el tamaño de un archivo
 #[tauri::command]
 fn get_file_size(app: tauri::AppHandle, file_name: String) -> Result<u64, String> {
     let models_dir = resolve_models_dir(&app)?;
@@ -226,27 +295,6 @@ fn get_file_size(app: tauri::AppHandle, file_name: String) -> Result<u64, String
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![
-            get_models_dir,
-            get_current_models_dir,
-            set_models_dir,
-            list_downloaded_models,
-            check_model_exists,
-            download_model,
-            delete_model,
-            get_file_size,
-            import_model
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
-}
-
-// Comando para importar un modelo local
 #[tauri::command]
 fn import_model(app: tauri::AppHandle, file_path: String) -> Result<String, String> {
     let models_dir = resolve_models_dir(&app)?;
@@ -266,4 +314,175 @@ fn import_model(app: tauri::AppHandle, file_path: String) -> Result<String, Stri
     fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
     
     Ok(file_name)
+}
+
+#[tauri::command]
+async fn start_video_analysis(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    url: String,
+    model_name: String,
+    conf: f32,
+    classes: Option<String>,
+    device: String,
+    frames: i32,
+    quality: i32,
+) -> Result<(), String> {
+    let models_dir = resolve_models_dir(&app)?;
+    let model_path = models_dir.join(&model_name);
+    
+    if !model_path.exists() {
+        return Err("Model file not found".to_string());
+    }
+
+    let output_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+
+    if !output_dir.exists() {
+        fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
+    }
+
+    let resource_path = app.path().resolve("python/analyze_video.py", tauri::path::BaseDirectory::Resource)
+        .unwrap_or_else(|_| PathBuf::from(""));
+
+    let script_path = if resource_path.exists() {
+        resource_path
+    } else {
+        let exe_path = std::env::current_exe()
+            .unwrap_or_else(|_| PathBuf::from("."));
+        
+        let candidates = vec![
+            exe_path.parent().unwrap().join("../src-tauri/python/analyze_video.py"),
+            PathBuf::from("src-tauri/python/analyze_video.py"),
+            PathBuf::from("./python/analyze_video.py"),
+        ];
+        
+        let mut found = false;
+        let mut script = PathBuf::new();
+        
+        for candidate in candidates {
+            if candidate.exists() {
+                found = true;
+                script = candidate;
+                break;
+            }
+        }
+        
+        if !found {
+            return Err(format!("Script no encontrado en ninguna ubicación esperada"));
+        }
+        
+        script
+    };
+
+    let python_exe = find_python_executable()?;
+
+    let mut args = vec![
+        script_path.to_string_lossy().to_string(),
+        "--url".to_string(), url,
+        "--model".to_string(), model_path.to_string_lossy().to_string(),
+        "--output_dir".to_string(), output_dir.to_string_lossy().to_string(),
+        "--conf".to_string(), conf.to_string(),
+        "--device".to_string(), device,
+        "--frames".to_string(), frames.to_string(),
+        "--quality".to_string(), quality.to_string(),
+    ];
+
+    if let Some(cls) = classes {
+        args.push("--classes".to_string());
+        args.push(cls);
+    }
+
+    let mut command = std::process::Command::new(&python_exe);
+    command.args(&args);
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn python: {} (path: {})", e, python_exe))?;
+
+    let stdout = child.stdout.take()
+        .ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take()
+        .ok_or("Failed to capture stderr")?;
+
+    let window_stdout = window.clone();
+    let window_stderr = window.clone();
+
+    // Thread para leer stdout en tiempo real
+    std::thread::spawn(move || {
+        use std::io::{BufRead, BufReader};
+        let reader = BufReader::new(stdout);
+        
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        let _ = window_stdout.emit("analysis-progress", &json_val);
+                    } else {
+                        eprintln!("Python stdout: {}", line);
+                    }
+                }
+            }
+        }
+    });
+
+    // Thread para leer stderr en tiempo real
+    std::thread::spawn(move || {
+        use std::io::{BufRead, BufReader};
+        let reader = BufReader::new(stderr);
+        
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && !line.contains("DEBUG") && !line.contains("WARNING") {
+                    eprintln!("Python stderr: {}", line);
+                    let _ = window_stderr.emit("analysis-error", line.to_string());
+                }
+            }
+        }
+    });
+
+    // Esperar a que el proceso termine en un async task
+    let window_final = window.clone();
+    tauri::async_runtime::spawn(async move {
+        match child.wait() {
+            Ok(status) => {
+                if !status.success() {
+                    let _ = window_final.emit("analysis-error", 
+                        format!("Script failed with exit code: {:?}", status.code()));
+                }
+            }
+            Err(e) => {
+                let _ = window_final.emit("analysis-error", format!("Failed to wait for child: {}", e));
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![
+            get_models_dir,
+            get_current_models_dir,
+            set_models_dir,
+            list_downloaded_models,
+            check_model_exists,
+            download_model,
+            delete_model,
+            get_file_size,
+            import_model,
+            start_video_analysis
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

@@ -460,9 +460,195 @@ async fn start_video_analysis(
                 let _ = window_final.emit("analysis-error", format!("Failed to wait for child: {}", e));
             }
         }
+
     });
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BBox {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Detection {
+    frame_number: i32,
+    timestamp: String,
+    class: String,
+    confidence: f32,
+    bbox: BBox,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisResult {
+    id: String,
+    video_url: String,
+    thumbnail: String,
+    title: String,
+    duration: String,
+    analyzed_date: String,
+    total_objects: i32,
+    detected_classes: Vec<String>,
+    model: String,
+    quality: String,
+    frames_interval: i32,
+    min_confidence: f32,
+    processing_time: String,
+    result_path: String,
+    fps: i32,
+    detections: Vec<Detection>,
+}
+
+#[tauri::command]
+fn get_all_analysis_results(app: tauri::AppHandle) -> Result<Vec<AnalysisResult>, String> {
+    let output_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+
+    if !output_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut results = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(output_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    // Use a lenient deserialization or default values if fields are missing
+                    // For now, we assume the JSON structure matches. 
+                    // If detections are missing (old files), this might fail.
+                    // To handle backward compatibility, we could make detections optional or default to empty.
+                    if let Ok(result) = serde_json::from_str::<AnalysisResult>(&content) {
+                        results.push(result);
+                    } else {
+                        // Try to deserialize without detections/fps for backward compatibility
+                        #[derive(Deserialize)]
+                        #[serde(rename_all = "camelCase")]
+                        struct LegacyAnalysisResult {
+                            id: String,
+                            video_url: String,
+                            thumbnail: String,
+                            title: String,
+                            duration: String,
+                            analyzed_date: String,
+                            total_objects: i32,
+                            detected_classes: Vec<String>,
+                            model: String,
+                            quality: String,
+                            frames_interval: i32,
+                            min_confidence: f32,
+                            processing_time: String,
+                            result_path: String,
+                        }
+
+                        if let Ok(legacy) = serde_json::from_str::<LegacyAnalysisResult>(&content) {
+                            results.push(AnalysisResult {
+                                id: legacy.id,
+                                video_url: legacy.video_url,
+                                thumbnail: legacy.thumbnail,
+                                title: legacy.title,
+                                duration: legacy.duration,
+                                analyzed_date: legacy.analyzed_date,
+                                total_objects: legacy.total_objects,
+                                detected_classes: legacy.detected_classes,
+                                model: legacy.model,
+                                quality: legacy.quality,
+                                frames_interval: legacy.frames_interval,
+                                min_confidence: legacy.min_confidence,
+                                processing_time: legacy.processing_time,
+                                result_path: legacy.result_path,
+                                fps: 30, // Default
+                                detections: Vec::new(), // Default
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by date descending
+    results.sort_by(|a, b| b.analyzed_date.cmp(&a.analyzed_date));
+
+    Ok(results)
+}
+
+#[tauri::command]
+fn get_analysis_result(app: tauri::AppHandle, id: String) -> Result<AnalysisResult, String> {
+    let output_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+
+    if !output_dir.exists() {
+        return Err("Analysis directory not found".to_string());
+    }
+
+    // Search for the file with the matching ID inside the JSON content
+    // Since filenames are based on video ID, we can try to find the file directly if filename == id.json
+    // But the filename is actually based on the video title or original filename in download_video.
+    // Wait, download_video uses '%(id)s.%(ext)s', so the filename IS the video ID.
+    // So the JSON filename should be {id}.json.
+    
+    // The Python script saves files as analyzed_{video_id}.json
+    let file_path = output_dir.join(format!("analyzed_{}.json", id));
+    
+    if file_path.exists() {
+        let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+        if let Ok(result) = serde_json::from_str::<AnalysisResult>(&content) {
+            return Ok(result);
+        }
+        
+        // Try legacy format
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct LegacyAnalysisResult {
+            id: String,
+            video_url: String,
+            thumbnail: String,
+            title: String,
+            duration: String,
+            analyzed_date: String,
+            total_objects: i32,
+            detected_classes: Vec<String>,
+            model: String,
+            quality: String,
+            frames_interval: i32,
+            min_confidence: f32,
+            processing_time: String,
+            result_path: String,
+        }
+
+        if let Ok(legacy) = serde_json::from_str::<LegacyAnalysisResult>(&content) {
+            return Ok(AnalysisResult {
+                id: legacy.id,
+                video_url: legacy.video_url,
+                thumbnail: legacy.thumbnail,
+                title: legacy.title,
+                duration: legacy.duration,
+                analyzed_date: legacy.analyzed_date,
+                total_objects: legacy.total_objects,
+                detected_classes: legacy.detected_classes,
+                model: legacy.model,
+                quality: legacy.quality,
+                frames_interval: legacy.frames_interval,
+                min_confidence: legacy.min_confidence,
+                processing_time: legacy.processing_time,
+                result_path: legacy.result_path,
+                fps: 30,
+                detections: Vec::new(),
+            });
+        }
+    }
+
+    Err("Analysis not found".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -481,7 +667,9 @@ pub fn run() {
             delete_model,
             get_file_size,
             import_model,
-            start_video_analysis
+            start_video_analysis,
+            get_all_analysis_results,
+            get_analysis_result
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

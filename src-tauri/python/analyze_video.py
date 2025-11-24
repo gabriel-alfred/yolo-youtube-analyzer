@@ -13,6 +13,7 @@ import shutil
 import time
 import subprocess
 import tempfile
+from datetime import datetime
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='YOLO Video Analyzer')
@@ -62,7 +63,7 @@ def emit_progress(status, progress=None, **kwargs):
         time.sleep(0.01)
 
 def download_video(url, output_dir):
-    """Descarga un video de YouTube"""
+    """Descarga un video de YouTube y retorna path y metadata"""
     ydl_opts = {
         'format': 'best[ext=mp4]',
         'outtmpl': os.path.join(output_dir, '%(id)s.%(ext)s'),
@@ -76,11 +77,23 @@ def download_video(url, output_dir):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
+            
+            # Extraer metadata relevante
+            metadata = {
+                'title': info.get('title', 'Unknown Title'),
+                'thumbnail': info.get('thumbnail', ''),
+                'duration': info.get('duration_string', '0:00'),
+                'upload_date': info.get('upload_date', ''),
+                'uploader': info.get('uploader', ''),
+                'video_id': info.get('id', ''),
+                'original_url': url
+            }
+            
     except Exception as e:
         raise Exception(f"Error descargando video: {str(e)}")
     
     emit_progress("download_complete", progress=10, message="Video descargado")
-    return filename
+    return filename, metadata
 
 def check_ffmpeg():
     """Verifica si FFmpeg está disponible"""
@@ -93,8 +106,37 @@ def check_ffmpeg():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
-def analyze_video(video_path, model_path, output_dir, conf, classes, device, frames_skip, quality):
+def save_analysis_metadata(output_path, metadata, stats, config):
+    """Guarda los metadatos del análisis en un archivo JSON"""
+    json_path = os.path.splitext(output_path)[0] + '.json'
+    
+    analysis_data = {
+        'id': metadata['video_id'],
+        'videoUrl': metadata['original_url'],
+        'thumbnail': metadata['thumbnail'],
+        'title': metadata['title'],
+        'duration': metadata['duration'],
+        'analyzedDate': datetime.now().isoformat(),
+        'totalObjects': stats['total_objects'],
+        'detectedClasses': list(stats['detected_classes']),
+        'model': os.path.basename(config['model']),
+        'quality': f"{config['quality']}p" if config['quality'] > 0 else "Auto",
+        'framesInterval': config['frames'],
+        'minConfidence': config['conf'],
+        'processingTime': stats['processing_time'],
+        'resultPath': output_path,
+        'fps': config['fps'],
+        'detections': stats['detections']
+    }
+    
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(analysis_data, f, indent=2, ensure_ascii=False)
+        
+    return json_path
+
+def analyze_video(video_path, model_path, output_dir, conf, classes, device, frames_skip, quality, metadata):
     """Analiza un video con YOLO con streaming de frames"""
+    start_time = time.time()
     try:
         emit_progress("loading_model", progress=10, message="Cargando modelo...")
         model = YOLO(model_path)
@@ -118,6 +160,14 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
         output_path = os.path.join(output_dir, output_filename)
         last_emit_time = 0
         temp_dir = None
+        
+        # Stats tracking
+        stats = {
+            'total_objects': 0,
+            'detected_classes': set(),
+            'processing_time': '',
+            'detections': []
+        }
         
         # Estrategia: Usar FFmpeg si está disponible, sino intentar OpenCV con mp4v
         use_ffmpeg = check_ffmpeg()
@@ -181,9 +231,11 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
         emit_progress("analyzing", progress=20, message="Iniciando análisis...")
         
         frames_lock = threading.Lock()
+        stats_lock = threading.Lock()
         
-        def process_frame(frame):
+        def process_frame(frame_data):
             """Procesa un frame con YOLO"""
+            frame, frame_num = frame_data
             try:
                 results = model(
                     frame, 
@@ -192,7 +244,44 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
                     device=device,
                     verbose=False
                 )
-                return results[0].plot()
+                
+                # Update stats
+                result = results[0]
+                
+                # Calculate timestamp
+                timestamp_sec = frame_num / fps
+                minutes = int(timestamp_sec // 60)
+                seconds = int(timestamp_sec % 60)
+                timestamp_str = f"{minutes:02d}:{seconds:02d}"
+                
+                frame_detections = []
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    class_name = result.names[cls_id]
+                    confidence = float(box.conf[0])
+                    xywh = box.xywh[0].tolist()
+                    
+                    frame_detections.append({
+                        'frameNumber': frame_num,
+                        'timestamp': timestamp_str,
+                        'class': class_name,
+                        'confidence': confidence,
+                        'bbox': {
+                            'x': int(xywh[0]),
+                            'y': int(xywh[1]),
+                            'width': int(xywh[2]),
+                            'height': int(xywh[3])
+                        }
+                    })
+
+                with stats_lock:
+                    stats['total_objects'] += len(result.boxes)
+                    for cls_id in result.boxes.cls:
+                        class_name = result.names[int(cls_id)]
+                        stats['detected_classes'].add(class_name)
+                    stats['detections'].extend(frame_detections)
+                
+                return result.plot()
             except Exception as e:
                 emit_progress("error", message=f"Error en frame: {str(e)}")
                 return frame
@@ -253,7 +342,9 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
                 ret, frame = cap.read()
                 if not ret:
                     if frame_batch:
-                        results = list(executor.map(process_frame, frame_batch))
+                        # Pass tuple of (frame, frame_num) to process_frame
+                        batch_data = list(zip(frame_batch, frame_indices))
+                        results = list(executor.map(process_frame, batch_data))
                         for idx, result_frame in enumerate(results):
                             save_and_emit_frame(result_frame, frame_indices[idx])
                             progress = int(20 + (frame_indices[idx] / max(total_frames, 1)) * 75)
@@ -277,7 +368,9 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
                 frame_indices.append(frame_count)
                 
                 if len(frame_batch) >= max_workers:
-                    results = list(executor.map(process_frame, frame_batch))
+                    # Pass tuple of (frame, frame_num) to process_frame
+                    batch_data = list(zip(frame_batch, frame_indices))
+                    results = list(executor.map(process_frame, batch_data))
                     for idx, result_frame in enumerate(results):
                         save_and_emit_frame(result_frame, frame_indices[idx])
                         progress = int(20 + (frame_indices[idx] / max(total_frames, 1)) * 75)
@@ -362,7 +455,25 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
                 if os.path.exists(temp_output):
                     os.remove(temp_output)
         
+        # Calculate processing time
+        end_time = time.time()
+        duration_sec = int(end_time - start_time)
+        minutes = duration_sec // 60
+        seconds = duration_sec % 60
+        stats['processing_time'] = f"{minutes}m {seconds}s"
+        
+        # Save metadata
+        config = {
+            'model': model_path,
+            'quality': quality,
+            'frames': frames_skip,
+            'conf': conf,
+            'fps': fps
+        }
+        json_path = save_analysis_metadata(output_path, metadata, stats, config)
+        
         emit_progress("info", message=f"Video guardado: {output_path} ({file_size} bytes, codec: {used_codec})")
+        emit_progress("info", message=f"Metadatos guardados: {json_path}")
 
         return output_path
         
@@ -385,7 +496,7 @@ def main():
         emit_progress("config_received", progress=5, 
                      message=f"Configuración: conf={args.conf}, device={validated_device}, frames={args.frames}")
         
-        video_path = download_video(args.url, args.output_dir)
+        video_path, metadata = download_video(args.url, args.output_dir)
         
         output_path = analyze_video(
             video_path, 
@@ -395,7 +506,8 @@ def main():
             args.classes,
             validated_device,
             args.frames,
-            args.quality
+            args.quality,
+            metadata
         )
         
         emit_progress("complete", progress=100, result_path=output_path, message="¡Análisis completado!")

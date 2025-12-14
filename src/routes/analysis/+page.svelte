@@ -3,6 +3,7 @@
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { open } from "@tauri-apps/plugin-shell";
+  import { page } from "$app/stores";
   import Button from "$lib/components/ui/Button.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import Input from "$lib/components/ui/Input.svelte";
@@ -198,8 +199,76 @@
     liveFrameData = null;
   }
 
+  async function checkActiveAnalysis() {
+    try {
+      const activeSession = await invoke("get_active_analysis");
+      if (activeSession) {
+        console.log("Found active session:", activeSession);
+        const { config } = activeSession as any;
+
+        // Restaurar estado
+        youtubeUrl = config.url;
+        selectedModel = config.model_name; // Note: this might need mapping back to display name if different
+        minPrecision = config.conf * 100;
+        selectedDevice = config.device;
+        frames = config.frames;
+        quality = config.quality;
+
+        // Restaurar clases
+        if (config.classes) {
+          const activeClasses = config.classes.split(",").map(Number);
+          // Reset all to false first
+          for (const key in selectedClasses) selectedClasses[key] = false;
+          // Set active ones to true
+          activeClasses.forEach((idx: number) => {
+            if (idx >= 0 && idx < COCO_CLASSES.length) {
+              selectedClasses[COCO_CLASSES[idx]] = true;
+            }
+          });
+        }
+
+        analyzing = true;
+        showLivePlayer = true;
+        statusMessage = "Reconectando con análisis en curso...";
+      }
+    } catch (e) {
+      console.error("Error checking active analysis:", e);
+    }
+  }
+
+  async function handleStop() {
+    try {
+      await invoke("stop_video_analysis");
+      analyzing = false;
+      statusMessage = "Análisis detenido por el usuario";
+      // Opcional: Mantener el player visible pero indicar que paró
+    } catch (e) {
+      console.error("Error stopping analysis:", e);
+      statusMessage = `Error al detener: ${e}`;
+    }
+  }
+
   onMount(async () => {
     await loadModels();
+    await checkActiveAnalysis();
+
+    if (!analyzing) {
+      const params = $page.url.searchParams;
+      if (params.has("url")) {
+        youtubeUrl = params.get("url") || "";
+        const modelParam = params.get("model");
+        if (modelParam) {
+          // Try to match with available models
+          const found = models.find(
+            (m) => m.name === modelParam || m.fileName === modelParam,
+          );
+          if (found) selectedModel = found.name;
+        }
+        if (params.has("conf")) minPrecision = parseFloat(params.get("conf")!);
+        if (params.has("frames")) frames = parseInt(params.get("frames")!);
+        if (params.has("quality")) quality = parseInt(params.get("quality")!);
+      }
+    }
 
     unlistenProgress = await listen("analysis-progress", (event: any) => {
       const payload = event.payload;
@@ -318,14 +387,14 @@
         </div>
         <div class="w-full md:w-auto">
           <Button
-            variant="primary"
+            variant={analyzing ? "danger" : "primary"}
             size="lg"
-            loading={analyzing}
-            disabled={!youtubeUrl || !selectedModel || analyzing}
-            onclick={handleAnalyze}
+            loading={analyzing && !showLivePlayer}
+            disabled={(!youtubeUrl || !selectedModel) && !analyzing}
+            onclick={analyzing ? handleStop : handleAnalyze}
             class="w-full md:w-auto min-w-[150px]"
           >
-            {analyzing ? "Analizando..." : "Analizar Video"}
+            {analyzing ? "Detener Análisis" : "Analizar Video"}
           </Button>
         </div>
       </div>
@@ -559,14 +628,14 @@
             {/snippet}
           </Input>
           <Button
-            variant="primary"
+            variant={analyzing ? "danger" : "primary"}
             size="lg"
-            loading={analyzing}
-            disabled={!youtubeUrl || !selectedModel || analyzing}
-            onclick={handleAnalyze}
+            loading={analyzing && !showLivePlayer}
+            disabled={(!youtubeUrl || !selectedModel) && !analyzing}
+            onclick={analyzing ? handleStop : handleAnalyze}
             class="w-full"
           >
-            {analyzing ? "Analizando..." : "Analizar Video"}
+            {analyzing ? "Detener Análisis" : "Analizar Video"}
           </Button>
         </div>
       </Card>

@@ -22,3 +22,4 @@ reqwest = { version = "0.12", features = ["stream"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["full"] }
 tauri-plugin-shell = "2.3.3"
+uuid = { version = "1.10", features = ["v4", "serde"] }

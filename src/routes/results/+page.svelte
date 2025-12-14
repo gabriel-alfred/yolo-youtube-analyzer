@@ -21,6 +21,7 @@
     minConfidence: number;
     processingTime: string;
     resultPath: string;
+    status?: string;
   }
 
   let analyses = $state<VideoAnalysis[]>([]);
@@ -106,6 +107,18 @@
     event.stopPropagation();
     // Implementar lógica de eliminación
     analyses = analyses.filter((a) => a.id !== id);
+  }
+
+  function handleRestart(analysis: VideoAnalysis, event: Event) {
+    event.stopPropagation();
+    const params = new URLSearchParams({
+      url: analysis.videoUrl,
+      model: analysis.model,
+      conf: (analysis.minConfidence * 100).toString(),
+      frames: analysis.framesInterval.toString(),
+      quality: analysis.quality.replace("p", ""),
+    });
+    goto(`/analysis?${params.toString()}`);
   }
 </script>
 
@@ -303,6 +316,18 @@
                 {formatDate(analysis.analyzedDate)}
               </div>
 
+              <!-- Status Badge -->
+              {#if analysis.status && analysis.status !== "complete"}
+                <div
+                  class="absolute top-3 right-3 px-2 py-1 rounded text-xs font-bold uppercase
+                  {analysis.status === 'analyzing'
+                    ? 'bg-blue-500/90 text-white animate-pulse'
+                    : 'bg-yellow-500/90 text-black'}"
+                >
+                  {analysis.status === "analyzing" ? "Analizando" : "Detenido"}
+                </div>
+              {/if}
+
               <!-- Hover Overlay -->
               <div
                 class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
@@ -443,9 +468,19 @@
               variant="primary"
               size="sm"
               class="flex-1"
+              disabled={!!(analysis.status && analysis.status !== "complete")}
               onclick={() => handleCardClick(analysis.id)}
             >
               Ver detalles
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              class="flex-1"
+              onclick={(e) => handleRestart(analysis, e)}
+            >
+              🔄 Reiniciar
             </Button>
 
             <Button

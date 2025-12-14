@@ -126,7 +126,8 @@ def save_analysis_metadata(output_path, metadata, stats, config):
         'processingTime': stats['processing_time'],
         'resultPath': output_path,
         'fps': config['fps'],
-        'detections': stats['detections']
+        'detections': stats['detections'],
+        'status': stats.get('status', 'complete')
     }
     
     with open(json_path, 'w', encoding='utf-8') as f:
@@ -497,6 +498,28 @@ def main():
                      message=f"Configuración: conf={args.conf}, device={validated_device}, frames={args.frames}")
         
         video_path, metadata = download_video(args.url, args.output_dir)
+        
+        # Guardar metadata inicial
+        initial_stats = {
+            'total_objects': 0,
+            'detected_classes': [],
+            'processing_time': 'En progreso...',
+            'detections': [],
+            'status': 'analyzing'
+        }
+        initial_config = {
+            'model': args.model,
+            'quality': args.quality,
+            'frames': args.frames,
+            'conf': args.conf,
+            'fps': 30 # Default until analyzed
+        }
+        
+        # Nombre temporal para el archivo de salida hasta que se cree el real
+        temp_output_filename = f"analyzed_{metadata['video_id']}.mp4"
+        temp_output_path = os.path.join(args.output_dir, temp_output_filename)
+        
+        save_analysis_metadata(temp_output_path, metadata, initial_stats, initial_config)
         
         output_path = analyze_video(
             video_path, 

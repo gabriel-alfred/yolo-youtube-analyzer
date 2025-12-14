@@ -1,10 +1,12 @@
 use tauri::Manager;
 use tauri::Emitter;
 use tauri_plugin_shell::ShellExt;
-use tauri_plugin_shell::process::CommandEvent;
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use uuid::Uuid;
+use std::process::Child;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadProgress {
@@ -25,6 +27,31 @@ impl Default for AppConfig {
             models_path: None,
         }
     }
+}
+
+// Estructura para mantener el estado de la sesión de análisis
+pub struct AnalysisSession {
+    id: String,
+    #[allow(dead_code)] // Se usa para matar el proceso
+    process: Child,
+    metadata: AnalysisConfig,
+}
+
+// Configuración del análisis para guardar en estado
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AnalysisConfig {
+    url: String,
+    model_name: String,
+    conf: f32,
+    classes: Option<String>,
+    device: String,
+    frames: i32,
+    quality: i32,
+}
+
+// Estado global de la aplicación
+pub struct AppState {
+    active_session: Mutex<Option<AnalysisSession>>,
 }
 
 fn get_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -319,7 +346,7 @@ fn import_model(app: tauri::AppHandle, file_path: String) -> Result<String, Stri
 #[tauri::command]
 async fn start_video_analysis(
     app: tauri::AppHandle,
-    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
     url: String,
     model_name: String,
     conf: f32,
@@ -327,7 +354,15 @@ async fn start_video_analysis(
     device: String,
     frames: i32,
     quality: i32,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    // Verificar si ya hay un análisis en curso
+    {
+        let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+        if active_session.is_some() {
+            return Err("Ya hay un análisis en curso. Detenlo antes de iniciar uno nuevo.".to_string());
+        }
+    }
+
     let models_dir = resolve_models_dir(&app)?;
     let model_path = models_dir.join(&model_name);
     
@@ -380,24 +415,31 @@ async fn start_video_analysis(
 
     let mut args = vec![
         script_path.to_string_lossy().to_string(),
-        "--url".to_string(), url,
+        "--url".to_string(), url.clone(),
         "--model".to_string(), model_path.to_string_lossy().to_string(),
         "--output_dir".to_string(), output_dir.to_string_lossy().to_string(),
         "--conf".to_string(), conf.to_string(),
-        "--device".to_string(), device,
+        "--device".to_string(), device.clone(),
         "--frames".to_string(), frames.to_string(),
         "--quality".to_string(), quality.to_string(),
     ];
 
-    if let Some(cls) = classes {
+    if let Some(cls) = &classes {
         args.push("--classes".to_string());
-        args.push(cls);
+        args.push(cls.clone());
     }
 
     let mut command = std::process::Command::new(&python_exe);
     command.args(&args);
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command
         .spawn()
@@ -408,8 +450,8 @@ async fn start_video_analysis(
     let stderr = child.stderr.take()
         .ok_or("Failed to capture stderr")?;
 
-    let window_stdout = window.clone();
-    let window_stderr = window.clone();
+    let app_handle = app.clone();
+    let app_handle_stderr = app.clone();
 
     // Thread para leer stdout en tiempo real
     std::thread::spawn(move || {
@@ -421,7 +463,15 @@ async fn start_video_analysis(
                 let trimmed = line.trim();
                 if !trimmed.is_empty() {
                     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                        let _ = window_stdout.emit("analysis-progress", &json_val);
+                        let _ = app_handle.emit("analysis-progress", &json_val);
+                        
+                        // Si el análisis se completa, limpiar la sesión
+                        if let Some(status) = json_val.get("status").and_then(|s| s.as_str()) {
+                            if status == "complete" || status == "error" {
+                                // Nota: No podemos limpiar la sesión aquí fácilmente porque necesitamos el State
+                                // Pero el frontend puede llamar a un comando para reconocer que terminó
+                            }
+                        }
                     } else {
                         eprintln!("Python stdout: {}", line);
                     }
@@ -440,30 +490,90 @@ async fn start_video_analysis(
                 let trimmed = line.trim();
                 if !trimmed.is_empty() && !line.contains("DEBUG") && !line.contains("WARNING") {
                     eprintln!("Python stderr: {}", line);
-                    let _ = window_stderr.emit("analysis-error", line.to_string());
+                    let _ = app_handle_stderr.emit("analysis-error", line.to_string());
                 }
             }
         }
     });
 
-    // Esperar a que el proceso termine en un async task
-    let window_final = window.clone();
-    tauri::async_runtime::spawn(async move {
-        match child.wait() {
-            Ok(status) => {
-                if !status.success() {
-                    let _ = window_final.emit("analysis-error", 
-                        format!("Script failed with exit code: {:?}", status.code()));
-                }
+    let session_id = Uuid::new_v4().to_string();
+    
+    let config = AnalysisConfig {
+        url,
+        model_name,
+        conf,
+        classes,
+        device,
+        frames,
+        quality,
+    };
+
+    let session = AnalysisSession {
+        id: session_id.clone(),
+        process: child,
+        metadata: config,
+    };
+
+    {
+        let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+        *active_session = Some(session);
+    }
+
+    Ok(session_id)
+}
+
+#[tauri::command]
+fn stop_video_analysis(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+    
+    if let Some(mut session) = active_session.take() {
+        // Intentar matar el proceso
+        let _ = session.process.kill();
+        // Esperar a que termine para evitar zombies
+        let _ = session.process.wait();
+        return Ok(());
+    }
+    
+    Err("No hay análisis activo para detener".to_string())
+}
+
+#[derive(Serialize)]
+struct ActiveAnalysisInfo {
+    id: String,
+    config: AnalysisConfig,
+}
+
+#[tauri::command]
+fn get_active_analysis(state: tauri::State<'_, AppState>) -> Result<Option<ActiveAnalysisInfo>, String> {
+    let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+    
+    let mut should_clear = false;
+    
+    if let Some(session) = &mut *active_session {
+        match session.process.try_wait() {
+            Ok(Some(_)) => {
+                // Process has exited
+                should_clear = true;
             }
-            Err(e) => {
-                let _ = window_final.emit("analysis-error", format!("Failed to wait for child: {}", e));
+            Ok(None) => {
+                // Process is still running
+                return Ok(Some(ActiveAnalysisInfo {
+                    id: session.id.clone(),
+                    config: session.metadata.clone(),
+                }));
+            }
+            Err(_) => {
+                // Error checking status, assume dead
+                should_clear = true;
             }
         }
-
-    });
-
-    Ok(())
+    }
+    
+    if should_clear {
+        *active_session = None;
+    }
+    
+    Ok(None)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -503,6 +613,8 @@ pub struct AnalysisResult {
     result_path: String,
     fps: i32,
     detections: Vec<Detection>,
+    #[serde(default)]
+    status: Option<String>,
 }
 
 #[tauri::command]
@@ -522,14 +634,10 @@ fn get_all_analysis_results(app: tauri::AppHandle) -> Result<Vec<AnalysisResult>
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    // Use a lenient deserialization or default values if fields are missing
-                    // For now, we assume the JSON structure matches. 
-                    // If detections are missing (old files), this might fail.
-                    // To handle backward compatibility, we could make detections optional or default to empty.
                     if let Ok(result) = serde_json::from_str::<AnalysisResult>(&content) {
                         results.push(result);
                     } else {
-                        // Try to deserialize without detections/fps for backward compatibility
+                        // Try legacy format
                         #[derive(Deserialize)]
                         #[serde(rename_all = "camelCase")]
                         struct LegacyAnalysisResult {
@@ -567,6 +675,7 @@ fn get_all_analysis_results(app: tauri::AppHandle) -> Result<Vec<AnalysisResult>
                                 result_path: legacy.result_path,
                                 fps: 30, // Default
                                 detections: Vec::new(), // Default
+                                status: Some("complete".to_string()),
                             });
                         }
                     }
@@ -591,12 +700,6 @@ fn get_analysis_result(app: tauri::AppHandle, id: String) -> Result<AnalysisResu
         return Err("Analysis directory not found".to_string());
     }
 
-    // Search for the file with the matching ID inside the JSON content
-    // Since filenames are based on video ID, we can try to find the file directly if filename == id.json
-    // But the filename is actually based on the video title or original filename in download_video.
-    // Wait, download_video uses '%(id)s.%(ext)s', so the filename IS the video ID.
-    // So the JSON filename should be {id}.json.
-    
     // The Python script saves files as analyzed_{video_id}.json
     let file_path = output_dir.join(format!("analyzed_{}.json", id));
     
@@ -644,6 +747,7 @@ fn get_analysis_result(app: tauri::AppHandle, id: String) -> Result<AnalysisResu
                 result_path: legacy.result_path,
                 fps: 30,
                 detections: Vec::new(),
+                status: Some("complete".to_string()),
             });
         }
     }
@@ -654,6 +758,9 @@ fn get_analysis_result(app: tauri::AppHandle, id: String) -> Result<AnalysisResu
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(AppState {
+            active_session: Mutex::new(None),
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
@@ -668,6 +775,8 @@ pub fn run() {
             get_file_size,
             import_model,
             start_video_analysis,
+            stop_video_analysis,
+            get_active_analysis,
             get_all_analysis_results,
             get_analysis_result
         ])

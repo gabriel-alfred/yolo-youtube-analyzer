@@ -206,6 +206,11 @@
         console.log("Found active session:", activeSession);
         const { config } = activeSession as any;
 
+        // Only restore if it's a video analysis
+        if (config.mode && config.mode !== "video") {
+          return;
+        }
+
         // Restaurar estado
         youtubeUrl = config.url;
         selectedModel = config.model_name; // Note: this might need mapping back to display name if different

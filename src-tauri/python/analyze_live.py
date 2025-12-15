@@ -84,6 +84,7 @@ class VideoCaptureThread:
             raise Exception("No se pudo abrir el stream de video")
         self.status = True
         self.frame = None
+        self.frame_id = 0
         self.lock = threading.Lock()
         self.thread = threading.Thread(target=self.update, args=())
         self.thread.daemon = True
@@ -96,16 +97,17 @@ class VideoCaptureThread:
                 if self.status:
                     with self.lock:
                         self.frame = frame
+                        self.frame_id += 1
                 else:
                     break
             else:
                 break
-            # Small sleep to avoid hogging CPU if read is very fast (unlikely for stream)
+            # Minimal sleep to yield CPU, but keep reading as fast as possible to drain buffer
             time.sleep(0.001)
 
     def read(self):
         with self.lock:
-            return self.status, self.frame
+            return self.status, self.frame, self.frame_id
 
     def get_props(self):
         width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -149,18 +151,26 @@ def analyze_stream(stream_url, model_path, conf, classes, device):
                 class_list = None
 
         frame_count = 0
-        target_fps = 30.0 # Target UI FPS
-        frame_interval = 1.0 / target_fps
+        
+        # No artificial FPS limiting. We follow the stream's pace.
+        # The capture thread drains the buffer. We just pick up the latest frame.
+        
+        last_processed_id = -1
         
         while cap_thread.status:
-            start_time = time.time()
+            # Get latest frame
+            ret, frame, current_id = cap_thread.read()
             
-            ret, frame = cap_thread.read()
-            if not ret or frame is None:
-                if not cap_thread.status: break
-                time.sleep(0.01)
+            if not ret:
+                break
+                
+            # If we already processed this frame ID, wait for a new one
+            # This effectively syncs us to the capture thread's speed (which is the stream speed)
+            if frame is None or current_id == last_processed_id:
+                time.sleep(0.001) # Minimal sleep to yield CPU
                 continue
             
+            last_processed_id = current_id
             frame_count += 1
             
             # Run inference
@@ -175,7 +185,7 @@ def analyze_stream(stream_url, model_path, conf, classes, device):
             # Draw results
             result_frame = results[0].plot()
             
-            # Resize for transmission if too large (optional, keeps UI responsive)
+            # Resize for transmission
             preview_height = 480
             scale = preview_height / result_frame.shape[0]
             preview_width = int(result_frame.shape[1] * scale)
@@ -197,15 +207,13 @@ def analyze_stream(stream_url, model_path, conf, classes, device):
             emit_progress(
                 "frame",
                 frame_data=frame_base64,
-                frame_number=frame_count,
+                frame_number=current_id,
                 detections=detections,
                 fps=fps
             )
             
-            # Maintain target FPS
-            process_time = time.time() - start_time
-            sleep_time = max(0, frame_interval - process_time)
-            time.sleep(sleep_time)
+            # No sleep here. We are ready for the next frame immediately.
+            # If the next frame hasn't arrived yet, the loop top will wait.
             
     except Exception as e:
         emit_progress("error", message=f"Error en análisis: {str(e)}")

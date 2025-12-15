@@ -47,6 +47,7 @@ pub struct AnalysisConfig {
     device: String,
     frames: i32,
     quality: i32,
+    mode: String,
 }
 
 // Estado global de la aplicación
@@ -488,6 +489,7 @@ async fn start_live_analysis(
         device,
         frames: 1,
         quality: 0, // Not used for live
+        mode: "live".to_string(),
     };
 
     let session = AnalysisSession {
@@ -667,6 +669,7 @@ async fn start_video_analysis(
         device,
         frames,
         quality,
+        mode: "video".to_string(),
     };
 
     let session = AnalysisSession {

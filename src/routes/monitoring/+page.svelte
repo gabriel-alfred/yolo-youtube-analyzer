@@ -58,8 +58,39 @@
     try {
       const activeSession = await invoke("get_active_analysis");
       if (activeSession) {
-        // Stop any existing session to start fresh
-        await invoke("stop_video_analysis");
+        console.log("Found active session:", activeSession);
+        const { config } = activeSession as any;
+
+        // Only restore if it's a live analysis
+        if (config.mode && config.mode !== "live") {
+          return;
+        }
+
+        // Restore state
+        streamUrl = config.url;
+        // Try to match model name or filename
+        const modelMatch = models.find(
+          (m) =>
+            m.fileName === config.model_name || m.name === config.model_name,
+        );
+        if (modelMatch) selectedModel = modelMatch.name;
+
+        confidenceThreshold = config.conf;
+        selectedDevice = config.device;
+
+        // Restore classes
+        if (config.classes) {
+          const activeClassesIndices = config.classes.split(",").map(Number);
+          selectedClasses = []; // Reset
+          activeClassesIndices.forEach((idx: number) => {
+            if (idx >= 0 && idx < COCO_CLASSES.length) {
+              selectedClasses.push(COCO_CLASSES[idx]);
+            }
+          });
+        }
+
+        isLoading = true;
+        statusMessage = "Reconectando con stream...";
       }
     } catch (e) {
       console.error("Error checking active session:", e);
@@ -96,9 +127,7 @@
   onDestroy(() => {
     if (unlistenProgress) unlistenProgress();
     if (unlistenError) unlistenError();
-    if (isStreaming) {
-      invoke("stop_video_analysis").catch(console.error);
-    }
+    // Do NOT stop analysis here, so it persists when switching tabs
   });
 
   const qualities = [

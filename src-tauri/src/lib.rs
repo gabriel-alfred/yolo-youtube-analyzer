@@ -47,6 +47,7 @@ pub struct AnalysisConfig {
     device: String,
     frames: i32,
     quality: i32,
+    mode: String,
 }
 
 // Estado global de la aplicación
@@ -344,6 +345,168 @@ fn import_model(app: tauri::AppHandle, file_path: String) -> Result<String, Stri
 }
 
 #[tauri::command]
+async fn start_live_analysis(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    url: String,
+    model_name: String,
+    conf: f32,
+    classes: Option<String>,
+    device: String,
+    quality: String,
+) -> Result<String, String> {
+    // Verificar si ya hay un análisis en curso
+    {
+        let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+        if active_session.is_some() {
+            return Err("Ya hay un análisis en curso. Detenlo antes de iniciar uno nuevo.".to_string());
+        }
+    }
+
+    let models_dir = resolve_models_dir(&app)?;
+    let model_path = models_dir.join(&model_name);
+    
+    if !model_path.exists() {
+        return Err("Model file not found".to_string());
+    }
+
+    let resource_path = app.path().resolve("python/analyze_live.py", tauri::path::BaseDirectory::Resource)
+        .unwrap_or_else(|_| PathBuf::from(""));
+
+    let script_path = if resource_path.exists() {
+        resource_path
+    } else {
+        let exe_path = std::env::current_exe()
+            .unwrap_or_else(|_| PathBuf::from("."));
+        
+        let candidates = vec![
+            exe_path.parent().unwrap().join("../src-tauri/python/analyze_live.py"),
+            PathBuf::from("src-tauri/python/analyze_live.py"),
+            PathBuf::from("./python/analyze_live.py"),
+        ];
+        
+        let mut found = false;
+        let mut script = PathBuf::new();
+        
+        for candidate in candidates {
+            if candidate.exists() {
+                found = true;
+                script = candidate;
+                break;
+            }
+        }
+        
+        if !found {
+            return Err(format!("Script analyze_live.py no encontrado"));
+        }
+        
+        script
+    };
+
+    let python_exe = find_python_executable()?;
+
+    let mut args = vec![
+        script_path.to_string_lossy().to_string(),
+        "--url".to_string(), url.clone(),
+        "--model".to_string(), model_path.to_string_lossy().to_string(),
+        "--conf".to_string(), conf.to_string(),
+        "--device".to_string(), device.clone(),
+        "--quality".to_string(), quality.clone(),
+    ];
+
+    if let Some(cls) = &classes {
+        args.push("--classes".to_string());
+        args.push(cls.clone());
+    }
+
+    let mut command = std::process::Command::new(&python_exe);
+    command.args(&args);
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn python: {} (path: {})", e, python_exe))?;
+
+    let stdout = child.stdout.take()
+        .ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take()
+        .ok_or("Failed to capture stderr")?;
+
+    let app_handle = app.clone();
+    let app_handle_stderr = app.clone();
+
+    // Thread para leer stdout en tiempo real
+    std::thread::spawn(move || {
+        use std::io::{BufRead, BufReader};
+        let reader = BufReader::new(stdout);
+        
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        let _ = app_handle.emit("analysis-progress", &json_val);
+                    } else {
+                        eprintln!("Python stdout: {}", line);
+                    }
+                }
+            }
+        }
+    });
+
+    // Thread para leer stderr en tiempo real
+    std::thread::spawn(move || {
+        use std::io::{BufRead, BufReader};
+        let reader = BufReader::new(stderr);
+        
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    eprintln!("Python stderr: {}", line);
+                    let _ = app_handle_stderr.emit("analysis-error", line.to_string());
+                }
+            }
+        }
+    });
+
+    let session_id = Uuid::new_v4().to_string();
+    
+    // Reuse AnalysisConfig but with dummy values for unused fields
+    let config = AnalysisConfig {
+        url,
+        model_name,
+        conf,
+        classes,
+        device,
+        frames: 1,
+        quality: 0, // Not used for live
+        mode: "live".to_string(),
+    };
+
+    let session = AnalysisSession {
+        id: session_id.clone(),
+        process: child,
+        metadata: config,
+    };
+
+    {
+        let mut active_session = state.active_session.lock().map_err(|e| e.to_string())?;
+        *active_session = Some(session);
+    }
+
+    Ok(session_id)
+}
+
+#[tauri::command]
 async fn start_video_analysis(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
@@ -506,6 +669,7 @@ async fn start_video_analysis(
         device,
         frames,
         quality,
+        mode: "video".to_string(),
     };
 
     let session = AnalysisSession {
@@ -774,6 +938,7 @@ pub fn run() {
             delete_model,
             get_file_size,
             import_model,
+            start_live_analysis,
             start_video_analysis,
             stop_video_analysis,
             get_active_analysis,

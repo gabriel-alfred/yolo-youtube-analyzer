@@ -41,6 +41,18 @@
   let currentFps = $state(0);
   let currentDetections = $state<string[]>([]);
 
+  // Buffering states
+  type FrameData = {
+    data: string;
+    number: number;
+    timestamp: number;
+  };
+  let frameBuffer = $state<FrameData[]>([]);
+  let animationFrameId: number | null = null;
+  let lastFrameTime = 0;
+  let lastRenderedFrameNumber = -1;
+  let isBuffering = $state(false);
+
   let models = $state<Model[]>([]);
   let availableModels = $derived(models.filter((m) => m.downloaded));
 
@@ -100,11 +112,23 @@
       const payload = event.payload;
 
       if (payload.status === "frame" && payload.frame_data) {
-        liveFrameData = `data:image/jpeg;base64,${payload.frame_data}`;
         if (payload.fps) currentFps = Math.round(payload.fps);
         if (payload.detections) currentDetections = payload.detections;
+
+        // Push to buffer instead of direct render
+        frameBuffer.push({
+          data: payload.frame_data,
+          number: payload.frame_number || 0,
+          timestamp: payload.timestamp || 0,
+        });
+
         isLoading = false;
         isStreaming = true;
+
+        // Ensure loop is running
+        if (!animationFrameId) {
+          startPlaybackLoop();
+        }
       } else if (payload.status === "error") {
         error = payload.message;
         isLoading = false;
@@ -138,6 +162,71 @@
 
   // Use COCO classes from lib
   const availableClasses = COCO_CLASSES;
+
+  function startPlaybackLoop() {
+    const loop = (timestamp: number) => {
+      if (!isStreaming) {
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+
+      if (frameBuffer.length === 0) {
+        if (!isBuffering) {
+          isBuffering = true;
+        }
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+
+      if (isBuffering && frameBuffer.length > 5) {
+        isBuffering = false;
+        lastFrameTime = timestamp;
+        // Start immediately
+        const frame = frameBuffer.shift();
+        if (frame) {
+          liveFrameData = `data:image/jpeg;base64,${frame.data}`;
+          lastRenderedFrameNumber = frame.number;
+        }
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+
+      if (lastRenderedFrameNumber === -1) {
+        const frame = frameBuffer.shift()!;
+        liveFrameData = `data:image/jpeg;base64,${frame.data}`;
+        lastRenderedFrameNumber = frame.number;
+        lastFrameTime = timestamp;
+      } else {
+        const nextFrame = frameBuffer[0];
+        // Use current FPS or default to 30 if 0
+        const fps = currentFps > 0 ? currentFps : 30;
+        const frameDelta = nextFrame.number - lastRenderedFrameNumber;
+
+        if (frameDelta <= 0) {
+          frameBuffer.shift();
+        } else {
+          const requiredDelay = (frameDelta / fps) * 1000;
+          const timeSinceLast = timestamp - lastFrameTime;
+
+          if (timeSinceLast >= requiredDelay) {
+            const frame = frameBuffer.shift()!;
+            liveFrameData = `data:image/jpeg;base64,${frame.data}`;
+            lastRenderedFrameNumber = frame.number;
+
+            // Sync logic
+            if (timeSinceLast > requiredDelay + 1000) {
+              lastFrameTime = timestamp;
+            } else {
+              lastFrameTime += requiredDelay;
+            }
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(loop);
+    };
+    animationFrameId = requestAnimationFrame(loop);
+  }
 
   // Functions
   async function handleStartStreaming() {
@@ -193,6 +282,12 @@
       showStopDialog = false;
       liveFrameData = null;
       statusMessage = "";
+
+      // Clear loop
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+      frameBuffer = [];
+      lastRenderedFrameNumber = -1;
     } catch (e) {
       console.error("Error stopping stream:", e);
       error = String(e);
@@ -240,7 +335,7 @@
             class="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"
           ></div>
           <span class="text-sm font-semibold text-red-100"
-            >EN VIVO {currentFps > 0 ? `(${currentFps} FPS)` : ""}</span
+            >EN VIVO {currentFps > 0 ? `(${currentFps} FPS)` : ""} | Buffer: {frameBuffer.length}</span
           >
         </div>
         <Button variant="danger" onclick={handleStopStreaming}>

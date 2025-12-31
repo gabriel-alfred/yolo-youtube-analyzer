@@ -209,7 +209,8 @@ def analyze_stream(stream_url, model_path, conf, classes, device):
                 frame_data=frame_base64,
                 frame_number=current_id,
                 detections=detections,
-                fps=fps
+                fps=fps,
+                timestamp=current_id / fps
             )
             
             # No sleep here. We are ready for the next frame immediately.

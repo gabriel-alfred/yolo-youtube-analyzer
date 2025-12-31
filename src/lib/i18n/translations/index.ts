@@ -1,0 +1,373 @@
+export interface Translations {
+    // Common
+    common: {
+        save: string;
+        cancel: string;
+        delete: string;
+        edit: string;
+        close: string;
+        confirm: string;
+        loading: string;
+        error: string;
+        success: string;
+        warning: string;
+        search: string;
+        filter: string;
+        clear: string;
+        download: string;
+        upload: string;
+        back: string;
+        next: string;
+        previous: string;
+        yes: string;
+        no: string;
+        storageLimitReached: string;
+        analysisConflict: string;
+        understood: string;
+        stopAndContinue: string;
+    };
+
+    // Navigation
+    nav: {
+        dashboard: string;
+        analysis: string;
+        results: string;
+        models: string;
+        monitoring: string;
+        settings: string;
+    };
+
+    // Dashboard
+    dashboard: {
+        title: string;
+        subtitle: string;
+        heroTitle: string;
+        heroDescription: string;
+        quickActions: string;
+        newAnalysis: string;
+        viewResults: string;
+        manageModels: string;
+        liveMonitoring: string;
+        recentAnalysis: string;
+        noRecentAnalysis: string;
+        favoriteAnalysis: string;
+        addAnalysis: string;
+        dashboardTitle: string;
+        dashboardSubtitle: string;
+        noFavorites: string;
+        stats: {
+            totalAnalysis: string;
+            activeModels: string;
+            storageUsed: string;
+            avgProcessingTime: string;
+        };
+    };
+
+    // Analysis
+    analysis: {
+        title: string;
+        subtitle: string;
+        videoSource: string;
+        youtubeUrl: string;
+        localFile: string;
+        urlPlaceholder: string;
+        selectFile: string;
+        selectedFile: string;
+        modelSelection: string;
+        noModelsAvailable: string;
+        downloadModels: string;
+        detectionSettings: string;
+        confidence: string;
+        confidenceDesc: string;
+        iou: string;
+        iouDesc: string;
+        maxDetections: string;
+        maxDetectionsDesc: string;
+        advancedOptions: string;
+        frameSkip: string;
+        frameSkipDesc: string;
+        quality: string;
+        qualityLow: string;
+        qualityMedium: string;
+        qualityHigh: string;
+        startAnalysis: string;
+        stopAnalysis: string;
+        analyzing: string;
+        progress: string;
+        status: {
+            starting: string;
+            downloading: string;
+            download_complete: string;
+            loading_model: string;
+            opening_video: string;
+            preparing_output: string;
+            analyzing: string;
+            saving: string;
+            complete: string;
+            stopped_by_user: string;
+            error: string;
+        };
+        errors: {
+            noVideo: string;
+            noModel: string;
+            invalidUrl: string;
+            processingError: string;
+        };
+        // Model Configuration
+        modelConfig: string;
+        yoloModel: string;
+        frames: string;
+        qualityPercent: string;
+        minConfidencePercent: string;
+        processingDevice: string;
+        cpuSlow: string;
+        cpuRecommended: string;
+        gpuCuda: string;
+        gpuMps: string;
+        cudaReq: string;
+        mpsReq: string;
+        classesToDetect: string;
+        selectAll: string;
+        deselectAll: string;
+        selectModelPlaceholder: string;
+        noModelsDownloaded: string;
+        modelInfo: string;
+        modelInfoDesc1: string;
+        modelInfoDesc2: string;
+        modelInfoDesc3: string;
+        modelInfoDesc4: string;
+    };
+
+    // Results
+    results: {
+        title: string;
+        subtitle: string;
+        noResults: string;
+        analyzeFirst: string;
+        videoPreview: string;
+        detectionInfo: string;
+        totalDetections: string;
+        processingTime: string;
+        modelUsed: string;
+        videoSource: string;
+        date: string;
+        actions: string;
+        openLocation: string;
+        deleteResult: string;
+        favorite: string;
+        unfavorite: string;
+        confirmDelete: string;
+        confirmDeleteMessage: string;
+        detectionsByClass: string;
+        timeline: string;
+        exportData: string;
+        searchPlaceholder: string;
+        sortBy: string;
+        sort: {
+            date: string;
+            objects: string;
+            duration: string;
+        };
+        stats: {
+            analyzedVideos: string;
+            detectedObjects: string;
+            uniqueClasses: string;
+            modelsUsed: string;
+        };
+        viewDetails: string;
+        restart: string;
+        analyzing: string;
+        stopped: string;
+        details: {
+            loading: string;
+            error: string;
+            back: string;
+            processedIn: string;
+            objectsDetected: string;
+            uniqueClasses: string;
+            yoloModel: string;
+            minConfidence: string;
+            analysisConfig: string;
+            videoQuality: string;
+            framesPerSecond: string;
+            analysisInterval: string;
+            processingTime: string;
+            classStats: string;
+            filterByClass: string;
+            allClasses: string;
+            tabs: {
+                overview: string;
+                detections: string;
+            };
+            table: {
+                frame: string;
+                time: string;
+                class: string;
+                confidence: string;
+                position: string;
+            };
+        };
+    };
+
+    // Models
+    models: {
+        title: string;
+        subtitle: string;
+        available: string;
+        downloaded: string;
+        notDownloaded: string;
+        download: string;
+        downloading: string;
+        delete: string;
+        size: string;
+        status: string;
+        active: string;
+        inactive: string;
+        toggleActive: string;
+        classes: string;
+        selectClasses: string;
+        allClasses: string;
+        noClasses: string;
+        confirmDelete: string;
+        confirmDeleteMessage: string;
+        downloadError: string;
+        deleteError: string;
+        deleteDialog: {
+            title: string;
+            messageCustom: string;
+            messageStandard: string;
+            confirm: string;
+            cancel: string;
+        };
+        classesModal: {
+            title: string;
+            selectAll: string;
+            deselectAll: string;
+            saveAndClose: string;
+            status: string;
+        };
+        headers: {
+            state: string;
+            model: string;
+            size: string;
+            speed: string;
+            precision: string;
+            classes: string;
+            actions: string;
+        };
+        badges: {
+            custom: string;
+        };
+        import: {
+            title: string;
+            description: string;
+            instructions: string;
+            dropHere: string;
+            selectFile: string;
+            error: string;
+            maxSize: string;
+        };
+        location: string;
+        speeds: {
+            veryFast: string;
+            fast: string;
+            medium: string;
+            slow: string;
+            verySlow: string;
+            unknown: string;
+        };
+    };
+
+    // Monitoring
+    monitoring: {
+        title: string;
+        subtitle: string;
+        liveStream: string;
+        streamUrl: string;
+        streamPlaceholder: string;
+        startMonitoring: string;
+        stopMonitoring: string;
+        monitoring: string;
+        selectModel: string;
+        detectionSettings: string;
+        liveDetections: string;
+        noDetections: string;
+        fps: string;
+        latency: string;
+        alerts: string;
+        noAlerts: string;
+        saveSnapshot: string;
+        recordSession: string;
+        connecting: string;
+        processing: string;
+        noStream: string;
+        noStreamDesc: string;
+        model: string;
+        device: string;
+        confidence: string;
+        detections: string;
+        objectClasses: string;
+        all: string;
+        none: string;
+        yoloModel: string;
+        noModels: string;
+        streamQuality: string;
+        qualities: {
+            low: string;
+            medium: string;
+            high: string;
+            fpsFast: string;
+            fpsBalanced: string;
+            fpsDetailed: string;
+        };
+        deviceInfo: {
+            cpu: string;
+            cuda: string;
+            mps: string;
+        };
+        errors: {
+            invalidUrl: string;
+            selectModel: string;
+        };
+        confidenceThreshold: string;
+        minimum: string;
+        status: {
+            starting: string;
+        };
+    };
+
+    // Settings
+    settings: {
+        title: string;
+        subtitle: string;
+        language: string;
+        languageDesc: string;
+        spanish: string;
+        english: string;
+        euskera: string;
+        processing: string;
+        processingDevice: string;
+        cpu: string;
+        cpuDesc: string;
+        gpu: string;
+        gpuDesc: string;
+        mac: string;
+        macDesc: string;
+        storage: string;
+        modelsLocation: string;
+        modelsLocationDesc: string;
+        change: string;
+        compressResults: string;
+        compressResultsDesc: string;
+        storageLimit: string;
+        currentUsage: string;
+        calculating: string;
+        analysisResults: string;
+        downloadedModels: string;
+        total: string;
+        cleanStorage: string;
+        cleanStorageConfirm: string;
+        cleanStorageMessage: string;
+        deleteAll: string;
+    };
+}

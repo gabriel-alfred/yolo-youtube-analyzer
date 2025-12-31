@@ -7,6 +7,7 @@
   import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
   import { loadAppConfig, saveAppConfig, type AppConfig } from "$lib/config";
+  import { currentLanguage, t } from "$lib/i18n";
 
   // State
   let showCleanupDialog = $state(false);
@@ -23,6 +24,9 @@
   let resultsSize = $state(0);
   let modelsSize = $state(0);
   let isLoadingStorage = $state(true);
+
+  // Reactive translations
+  let translations = $derived($t);
 
   const languages = [
     { id: "es", name: "Español", flag: "🇪🇸" },
@@ -43,6 +47,9 @@
     };
 
     saveAppConfig(config);
+
+    // Update i18n store when language changes
+    currentLanguage.set(language);
 
     // Dispatch storage event for other tabs
     window.dispatchEvent(
@@ -135,10 +142,10 @@
   <h1
     class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
   >
-    Configuración
+    {translations.settings.title}
   </h1>
   <p class="text-slate-300 text-lg">
-    Personaliza el comportamiento de la aplicación
+    {translations.settings.subtitle}
   </p>
 </div>
 
@@ -160,7 +167,7 @@
             d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
           />
         </svg>
-        Idioma
+        {translations.settings.language}
       </h2>
     {/snippet}
 
@@ -184,7 +191,10 @@
             <div class="h-1/4 bg-red-600"></div>
           </div>
         </div>
-        <p class="text-sm font-medium text-red-100">Español</p>
+
+        <p class="text-sm font-medium text-red-100">
+          {translations.settings.spanish}
+        </p>
       </button>
 
       <!-- English -->
@@ -229,7 +239,10 @@
             </svg>
           </div>
         </div>
-        <p class="text-sm font-medium text-red-100">English</p>
+
+        <p class="text-sm font-medium text-red-100">
+          {translations.settings.english}
+        </p>
       </button>
 
       <!-- Euskera -->
@@ -262,7 +275,10 @@
             </svg>
           </div>
         </div>
-        <p class="text-sm font-medium text-red-100">Euskera</p>
+
+        <p class="text-sm font-medium text-red-100">
+          {translations.settings.euskera}
+        </p>
       </button>
     </div>
   </Card>
@@ -284,7 +300,7 @@
             d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
           />
         </svg>
-        Procesamiento
+        {translations.settings.processing}
       </h2>
     {/snippet}
 
@@ -292,7 +308,7 @@
       <!-- Device Selection -->
       <div>
         <div class="block text-sm font-medium text-red-200 mb-3">
-          Dispositivo de procesamiento
+          {translations.settings.processingDevice}
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
@@ -317,8 +333,12 @@
                 d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
               />
             </svg>
-            <p class="text-lg font-bold text-red-100 mb-1">CPU</p>
-            <p class="text-xs text-red-300/70">Mayor compatibilidad</p>
+            <p class="text-lg font-bold text-red-100 mb-1">
+              {translations.settings.cpu}
+            </p>
+            <p class="text-xs text-red-300/70">
+              {translations.settings.cpuDesc}
+            </p>
           </button>
 
           <button
@@ -343,8 +363,12 @@
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <p class="text-lg font-bold text-red-100 mb-1">GPU (CUDA)</p>
-            <p class="text-xs text-red-300/70">Máximo rendimiento</p>
+            <p class="text-lg font-bold text-red-100 mb-1">
+              {translations.settings.gpu}
+            </p>
+            <p class="text-xs text-red-300/70">
+              {translations.settings.gpuDesc}
+            </p>
           </button>
 
           <button
@@ -369,8 +393,12 @@
                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
               />
             </svg>
-            <p class="text-lg font-bold text-red-100 mb-1">Mac (MPS)</p>
-            <p class="text-xs text-red-300/70">Apple Silicon</p>
+            <p class="text-lg font-bold text-red-100 mb-1">
+              {translations.settings.mac}
+            </p>
+            <p class="text-xs text-red-300/70">
+              {translations.settings.macDesc}
+            </p>
           </button>
         </div>
       </div>
@@ -394,7 +422,7 @@
             d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
           />
         </svg>
-        Almacenamiento
+        {translations.settings.storage}
       </h2>
     {/snippet}
 
@@ -402,13 +430,13 @@
       <!-- Models Path -->
       <div>
         <div class="text-sm font-medium text-red-200 mb-2">
-          Ubicación de Modelos
+          {translations.settings.modelsLocation}
         </div>
         <div class="flex gap-3">
           <div
             class="flex-1 p-3 bg-slate-900/60 border border-red-500/20 rounded-lg text-sm text-red-100/80 font-mono truncate"
           >
-            {modelsPath || "Cargando..."}
+            {modelsPath || translations.common.loading}
           </div>
           <Button variant="secondary" onclick={changeModelsFolder}>
             {#snippet icon()}
@@ -426,11 +454,11 @@
                 />
               </svg>
             {/snippet}
-            Cambiar
+            {translations.settings.change}
           </Button>
         </div>
         <p class="text-xs text-red-300/60 mt-1">
-          Carpeta donde se guardan los modelos descargados
+          {translations.settings.modelsLocationDesc}
         </p>
       </div>
 
@@ -449,10 +477,10 @@
           <span
             class="text-sm font-medium text-red-100 group-hover:text-red-300 transition-colors"
           >
-            Comprimir resultados
+            {translations.settings.compressResults}
           </span>
           <p class="text-xs text-red-300/60">
-            Reduce el tamaño de los archivos de salida
+            {translations.settings.compressResultsDesc}
           </p>
         </div>
       </label>
@@ -461,7 +489,7 @@
       <div>
         <div class="flex items-center justify-between mb-2">
           <div class="text-sm font-medium text-red-200">
-            Límite de almacenamiento
+            {translations.settings.storageLimit}
           </div>
           <span class="text-lg font-bold text-red-100">{maxStorageSize} GB</span
           >
@@ -485,15 +513,19 @@
       <!-- Current Usage -->
       <div class="p-4 bg-slate-900/40 border border-red-500/20 rounded-lg">
         <h3 class="text-sm font-semibold text-red-100 mb-3">
-          Uso actual de almacenamiento
+          {translations.settings.currentUsage}
         </h3>
         {#if isLoadingStorage}
-          <div class="text-center text-red-300/60 py-4">Calculando...</div>
+          <div class="text-center text-red-300/60 py-4">
+            {translations.settings.calculating}
+          </div>
         {:else}
           <div class="space-y-3">
             <div>
               <div class="flex items-center justify-between text-sm mb-1">
-                <span class="text-red-200">Resultados de análisis</span>
+                <span class="text-red-200"
+                  >{translations.settings.analysisResults}</span
+                >
                 <span class="font-semibold text-red-100"
                   >{(resultsSize / 1024 ** 3).toFixed(2)} GB</span
                 >
@@ -512,7 +544,9 @@
             </div>
             <div>
               <div class="flex items-center justify-between text-sm mb-1">
-                <span class="text-red-200">Modelos descargados</span>
+                <span class="text-red-200"
+                  >{translations.settings.downloadedModels}</span
+                >
                 <span class="font-semibold text-red-100"
                   >{(modelsSize / 1024 ** 3).toFixed(2)} GB</span
                 >
@@ -531,7 +565,9 @@
             </div>
             <div class="pt-2 border-t border-red-500/20">
               <div class="flex items-center justify-between text-sm">
-                <span class="text-red-200 font-medium">Total</span>
+                <span class="text-red-200 font-medium"
+                  >{translations.settings.total}</span
+                >
                 <span class="font-bold text-red-100"
                   >{((resultsSize + modelsSize) / 1024 ** 3).toFixed(2)} GB / {maxStorageSize}
                   GB</span
@@ -559,7 +595,7 @@
             />
           </svg>
         {/snippet}
-        Limpiar almacenamiento
+        {translations.settings.cleanStorage}
       </Button>
     </div>
   </Card>
@@ -569,10 +605,10 @@
 <ConfirmationDialog
   bind:open={showCleanupDialog}
   variant="danger"
-  title="¿Limpiar almacenamiento?"
-  message="Esta acción eliminará TODOS los resultados de análisis y modelos descargados. Esta acción no se puede deshacer."
-  confirmText="Eliminar todo"
-  cancelText="Cancelar"
+  title={translations.settings.cleanStorageConfirm}
+  message={translations.settings.cleanStorageMessage}
+  confirmText={translations.settings.deleteAll}
+  cancelText={translations.common.cancel}
   onConfirm={confirmCleanup}
 />
 

@@ -20,6 +20,10 @@
     mergeModelsWithDownloads,
     type Model,
   } from "$lib/models";
+  import { t } from "$lib/i18n";
+
+  // Reactive translations
+  let translations = $derived($t);
 
   // Colores predefinidos
   const PRESET_COLORS = [
@@ -87,8 +91,8 @@
   let liveFrameData = $state<string | null>(null);
   let showConflictDialog = $state(false);
   let conflictDialogMessage = $state("");
-  let conflictDialogConfirmText = $state("Detener y Continuar");
-  let conflictDialogCancelText = $state("Cancelar");
+  let conflictDialogConfirmText = $state(translations.common.stopAndContinue);
+  let conflictDialogCancelText = $state(translations.common.cancel);
   let conflictDialogVariant = $state<"info" | "warning" | "danger" | "success">(
     "warning",
   );
@@ -178,16 +182,16 @@
 
   function getStatusMessage(status: string): string {
     const messages: Record<string, string> = {
-      starting: "Iniciando...",
-      downloading: "Descargando video...",
-      download_complete: "Descarga completada",
-      loading_model: "Cargando modelo...",
-      opening_video: "Abriendo video...",
-      preparing_output: "Preparando salida...",
-      analyzing: "Analizando video...",
-      saving: "Guardando resultado...",
-      complete: "¡Análisis completado!",
-      error: "Error en el análisis",
+      starting: translations.analysis.status.starting,
+      downloading: translations.analysis.status.downloading,
+      download_complete: translations.analysis.status.download_complete,
+      loading_model: translations.analysis.status.loading_model,
+      opening_video: translations.analysis.status.opening_video,
+      preparing_output: translations.analysis.status.preparing_output,
+      analyzing: translations.analysis.status.analyzing,
+      saving: translations.analysis.status.saving,
+      complete: translations.analysis.status.complete,
+      error: translations.analysis.status.error,
     };
     return messages[status] || status;
   }
@@ -209,7 +213,7 @@
     showLivePlayer = true;
     analysisComplete = false;
     progress = 0;
-    statusMessage = "Iniciando análisis...";
+    statusMessage = translations.analysis.status.starting;
     resultPath = null;
     currentFrameNumber = 0;
     liveFrameData = null;
@@ -225,8 +229,11 @@
         analyzing = false;
         showLivePlayer = false;
         showConflictDialog = true;
-        conflictDialogMessage = `Has alcanzado el límite de almacenamiento de ${appConfig.maxStorageSize} GB. Por favor, limpia el almacenamiento en Configuración antes de continuar.`;
-        conflictDialogConfirmText = "Entendido";
+        conflictDialogMessage = translations.common.storageLimitReached.replace(
+          "{max}",
+          appConfig.maxStorageSize.toString(),
+        );
+        conflictDialogConfirmText = translations.common.understood;
         conflictDialogVariant = "warning";
         conflictDialogCancelText = "";
         return;
@@ -259,7 +266,7 @@
       // Resetear todos los estados
       analysisComplete = false;
       progress = 0;
-      statusMessage = "Iniciando análisis...";
+      statusMessage = translations.analysis.status.starting;
       resultPath = null;
       currentFrameNumber = 0;
       liveFrameData = null;
@@ -294,15 +301,14 @@
       const errorMsg = String(error);
       if (errorMsg.includes("Ya hay un análisis en curso")) {
         showConflictDialog = true;
-        conflictDialogMessage =
-          "Ya existe un análisis activo en otra pestaña. Debes detenerlo antes de iniciar uno nuevo.";
-        conflictDialogConfirmText = "Entendido";
+        conflictDialogMessage = translations.common.analysisConflict;
+        conflictDialogConfirmText = translations.common.understood;
         conflictDialogVariant = "danger";
         conflictDialogCancelText = "";
         // alert("⚠️ Ya hay un análisis en curso.\n\nPor favor, detenlo antes de iniciar uno nuevo.");
       }
 
-      statusMessage = `Error: ${error}`;
+      statusMessage = `${translations.analysis.status.error}: ${error}`;
       analyzing = false;
       showLivePlayer = false;
     }
@@ -370,7 +376,7 @@
 
         analyzing = true;
         showLivePlayer = true;
-        statusMessage = "Reconectando con análisis en curso...";
+        statusMessage = translations.analysis.status.analyzing;
       }
     } catch (e) {
       console.error("Error checking active analysis:", e);
@@ -381,11 +387,11 @@
     try {
       await invoke("stop_video_analysis");
       analyzing = false;
-      statusMessage = "Análisis detenido por el usuario";
+      statusMessage = translations.analysis.status.stopped_by_user;
       // Opcional: Mantener el player visible pero indicar que paró
     } catch (e) {
       console.error("Error stopping analysis:", e);
-      statusMessage = `Error al detener: ${e}`;
+      statusMessage = `${translations.analysis.status.error}: ${e}`;
     }
   }
 
@@ -451,7 +457,7 @@
           analyzing = false;
           analysisComplete = true;
           progress = 100;
-          statusMessage = "¡Análisis completado!";
+          statusMessage = translations.analysis.status.complete;
           console.log("Analysis complete!");
           console.log("  - resultPath:", resultPath);
           console.log("  - analysisComplete:", analysisComplete);
@@ -476,7 +482,7 @@
         return;
       }
 
-      statusMessage = `Error: ${errorMsg}`;
+      statusMessage = `${translations.analysis.status.error}: ${errorMsg}`;
 
       // Solo detener si parece un error fatal o el script falló
       if (
@@ -501,10 +507,10 @@
   <h1
     class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
   >
-    Análisis de Video
+    {translations.analysis.title}
   </h1>
   <p class="text-slate-300 text-lg">
-    Analiza videos de YouTube con detección de objetos en tiempo real
+    {translations.analysis.subtitle}
   </p>
 </div>
 
@@ -515,7 +521,7 @@
       <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
           <Input
-            label="URL del Video de YouTube"
+            label={translations.analysis.youtubeUrl}
             placeholder="https://www.youtube.com/watch?v=..."
             bind:value={youtubeUrl}
             fullWidth
@@ -538,7 +544,9 @@
             onclick={analyzing ? handleStop : handleAnalyze}
             class="w-full md:w-auto min-w-[150px]"
           >
-            {analyzing ? "Detener Análisis" : "Analizar Video"}
+            {analyzing
+              ? translations.analysis.stopAnalysis
+              : translations.analysis.startAnalysis}
           </Button>
         </div>
       </div>
@@ -546,7 +554,9 @@
       <!-- Video Preview -->
       <div class="mt-6 flex justify-center">
         <div class="w-full max-w-md">
-          <h3 class="text-sm font-semibold text-red-200 mb-3">Vista Previa</h3>
+          <h3 class="text-sm font-semibold text-red-200 mb-3">
+            {translations.results.videoPreview}
+          </h3>
           <div
             class="relative rounded-lg overflow-hidden border border-red-500/30 shadow-lg shadow-red-500/20"
           >
@@ -571,7 +581,9 @@
       <div class="space-y-4">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold text-red-100">
-            {analysisComplete ? "Video Analizado" : "Análisis en Vivo"}
+            {analysisComplete
+              ? translations.analysis.status.complete
+              : translations.dashboard.liveMonitoring}
           </h2>
           <div class="flex items-center gap-3">
             {#if !analysisComplete}
@@ -616,7 +628,7 @@
                   />
                 </svg>
                 <p class="text-red-300 font-medium">
-                  Esperando primeros frames...
+                  {translations.analysis.status.starting}
                 </p>
                 <p class="text-red-400/60 text-sm">{statusMessage}</p>
               </div>
@@ -649,7 +661,7 @@
               class="p-4 bg-green-900/20 border border-green-500/30 rounded-lg"
             >
               <p class="text-green-100 font-semibold">
-                ✓ Análisis completado exitosamente
+                ✓ {translations.analysis.status.complete}
               </p>
               <p class="text-green-200/80 text-sm mt-1">
                 Archivo: {resultPath.split(/[\\/]/).pop()}
@@ -739,10 +751,10 @@
 
             <div class="flex justify-end gap-2">
               <Button variant="outline" size="sm" onclick={openResult}>
-                📁 Abrir ubicación del archivo
+                📁 {translations.results.openLocation}
               </Button>
               <Button variant="ghost" size="sm" onclick={resetAnalyzer}>
-                Nuevo Análisis
+                {translations.dashboard.newAnalysis}
               </Button>
             </div>
           </div>
@@ -758,7 +770,7 @@
       <Card variant="gradient" padding="lg">
         <div class="flex flex-col gap-4">
           <Input
-            label="URL del Video de YouTube"
+            label={translations.analysis.youtubeUrl}
             placeholder="https://www.youtube.com/watch?v=..."
             bind:value={youtubeUrl}
             fullWidth
@@ -779,7 +791,9 @@
             onclick={analyzing ? handleStop : handleAnalyze}
             class="w-full"
           >
-            {analyzing ? "Detener Análisis" : "Analizar Video"}
+            {analyzing
+              ? translations.analysis.stopAnalysis
+              : translations.analysis.startAnalysis}
           </Button>
         </div>
       </Card>
@@ -802,7 +816,7 @@
               d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          Configuración del Modelo
+          {translations.analysis.modelConfig}
         </h2>
       {/snippet}
 
@@ -813,7 +827,7 @@
             for="model-selector"
             class="block text-sm font-medium text-red-200 mb-2"
           >
-            Modelo YOLO
+            {translations.analysis.yoloModel}
           </label>
           <div class="relative z-50">
             <button
@@ -824,8 +838,8 @@
               <span
                 >{selectedModel ||
                   (availableModels.length > 0
-                    ? "Seleccionar modelo"
-                    : "No hay modelos descargados")}</span
+                    ? translations.analysis.selectModelPlaceholder
+                    : translations.analysis.noModelsDownloaded)}</span
               >
               <svg
                 class="w-5 h-5 text-red-400 transition-transform {modelDropdownOpen
@@ -897,7 +911,7 @@
           <!-- Frames -->
           <Input
             type="number"
-            label="Frames (cada N frames)"
+            label={translations.analysis.frames}
             bind:value={frames}
             min="1"
             fullWidth
@@ -906,7 +920,7 @@
           <!-- Quality -->
           <Input
             type="number"
-            label="Calidad (%)"
+            label={translations.analysis.qualityPercent}
             bind:value={quality}
             min="50"
             max="100"
@@ -916,7 +930,7 @@
           <!-- Min Precision -->
           <Input
             type="number"
-            label="Precisión Mínima (%)"
+            label={translations.analysis.minConfidencePercent}
             bind:value={minPrecision}
             max="100"
             fullWidth
@@ -925,23 +939,23 @@
           <!-- Device Selection -->
           <div>
             <label class="block text-sm font-medium text-red-200 mb-2">
-              Dispositivo de Procesamiento
+              {translations.analysis.processingDevice}
             </label>
             <select
               bind:value={selectedDevice}
               class="w-full px-3 py-2.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-red-100 hover:border-red-500/50 focus:border-red-500 transition-all focus:outline-none"
             >
-              <option value="cpu">CPU (Más lento, compatible)</option>
-              <option value="cuda">GPU NVIDIA (Más rápido)</option>
-              <option value="mps">GPU Apple Silicon (MacBook M1/M2)</option>
+              <option value="cpu">{translations.analysis.cpuSlow}</option>
+              <option value="cuda">{translations.analysis.gpuCuda}</option>
+              <option value="mps">{translations.analysis.gpuMps}</option>
             </select>
             <p class="text-xs text-red-300/60 mt-1">
               {#if selectedDevice === "cpu"}
-                Recomendado si no tienes GPU compatible
+                {translations.analysis.cpuRecommended}
               {:else if selectedDevice === "cuda"}
-                Requiere NVIDIA GPU y CUDA instalado
+                {translations.analysis.cudaReq}
               {:else if selectedDevice === "mps"}
-                Solo para MacBooks con chips Apple
+                {translations.analysis.mpsReq}
               {/if}
             </p>
           </div>
@@ -967,12 +981,12 @@
                 d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
               />
             </svg>
-            Clases a Detectar
+            {translations.analysis.classesToDetect}
           </h2>
           <Button variant="ghost" size="sm" onclick={toggleAllClasses}>
             {Object.values(selectedClasses).every((v) => v)
-              ? "Deseleccionar Todo"
-              : "Seleccionar Todo"}
+              ? translations.analysis.deselectAll
+              : translations.analysis.selectAll}
           </Button>
         </div>
       {/snippet}

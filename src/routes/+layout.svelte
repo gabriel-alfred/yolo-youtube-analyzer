@@ -5,6 +5,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api/core";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
+  import { currentLanguage, t } from "$lib/i18n";
 
   interface Props {
     children?: import("svelte").Snippet;
@@ -15,7 +16,13 @@
   let showExitDialog = $state(false);
   let isClosing = false; // Flag to prevent infinite loop
 
+  // Reactive translations
+  let translations = $derived($t);
+
   onMount(() => {
+    // Initialize i18n
+    currentLanguage.init();
+
     const appWindow = getCurrentWindow();
 
     // Intercept close request
@@ -27,13 +34,6 @@
         try {
           const activeSession = await invoke("get_active_analysis");
           if (activeSession) {
-            // Analysis active -> Prevent close and show dialog
-            // event.preventDefault(); // Tauri v2 listener doesn't need preventDefault on the event object for this specific event type in explicit listener, but let's check docs logic.
-            // Actually, 'tauri://close-requested' is an event we receive. To prevent close we usually don't need to do anything if we haven't called close() ourselves, BUT
-            // Standard Tauri flow: user clicks X -> event emitted. If we don't close manually, it might wait?
-            // Wait, usually we need to set `prevent_close` or similar in rust or just use the event.
-            // In Tauri v2, typically we can just interception.
-
             showExitDialog = true;
           } else {
             // No analysis -> Just close

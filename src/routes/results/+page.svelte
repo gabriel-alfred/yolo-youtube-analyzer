@@ -5,6 +5,9 @@
   import LoadingSpinner from "$lib/components/ui/LoadingSpinner.svelte";
   import { goto } from "$app/navigation";
   import { invoke } from "@tauri-apps/api/core";
+  import { t } from "$lib/i18n";
+
+  let translations = $derived($t);
 
   interface VideoAnalysis {
     id: string;
@@ -127,10 +130,10 @@
   <h1
     class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
   >
-    Análisis Realizados
+    {translations.results.title}
   </h1>
   <p class="text-slate-300 text-lg">
-    Explora todos los videos que has analizado con YOLO
+    {translations.results.subtitle}
   </p>
 </div>
 
@@ -143,7 +146,7 @@
         <Input
           bind:value={searchQuery}
           type="search"
-          placeholder="Buscar por título o clases detectadas..."
+          placeholder={translations.results.searchPlaceholder}
           fullWidth={true}
         >
           {#snippet icon()}
@@ -166,15 +169,19 @@
 
       <!-- Sort -->
       <div class="flex items-center gap-3">
-        <span class="text-sm text-red-300 whitespace-nowrap">Ordenar por:</span>
+        <span class="text-sm text-red-300 whitespace-nowrap"
+          >{translations.results.sortBy}</span
+        >
         <div class="relative">
           <select
             bind:value={sortBy}
             class="appearance-none pl-4 pr-9 py-2.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-red-50 focus:border-red-500 focus:outline-none transition-all cursor-pointer hover:bg-slate-900/80"
           >
-            <option value="date">Fecha</option>
-            <option value="objects">Objetos detectados</option>
-            <option value="duration">Duración</option>
+            <option value="date">{translations.results.sort.date}</option>
+            <option value="objects">{translations.results.sort.objects}</option>
+            <option value="duration"
+              >{translations.results.sort.duration}</option
+            >
           </select>
           <svg
             class="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-red-400"
@@ -199,7 +206,9 @@
     >
       <div class="text-center">
         <p class="text-3xl font-bold text-red-400">{analyses.length}</p>
-        <p class="text-sm text-red-300/70 mt-1">Videos analizados</p>
+        <p class="text-sm text-red-300/70 mt-1">
+          {translations.results.stats.analyzedVideos}
+        </p>
       </div>
       <div class="text-center">
         <p class="text-3xl font-bold text-orange-400">
@@ -207,19 +216,25 @@
             .reduce((sum, a) => sum + a.totalObjects, 0)
             .toLocaleString()}
         </p>
-        <p class="text-sm text-red-300/70 mt-1">Objetos detectados</p>
+        <p class="text-sm text-red-300/70 mt-1">
+          {translations.results.stats.detectedObjects}
+        </p>
       </div>
       <div class="text-center">
         <p class="text-3xl font-bold text-red-400">
           {new Set(analyses.flatMap((a) => a.detectedClasses)).size}
         </p>
-        <p class="text-sm text-red-300/70 mt-1">Clases únicas</p>
+        <p class="text-sm text-red-300/70 mt-1">
+          {translations.results.stats.uniqueClasses}
+        </p>
       </div>
       <div class="text-center">
         <p class="text-3xl font-bold text-orange-400">
           {new Set(analyses.map((a) => a.model)).size}
         </p>
-        <p class="text-sm text-red-300/70 mt-1">Modelos usados</p>
+        <p class="text-sm text-red-300/70 mt-1">
+          {translations.results.stats.modelsUsed}
+        </p>
       </div>
     </div>
   </Card>
@@ -227,7 +242,7 @@
   <!-- Loading State -->
   {#if loading}
     <div class="flex justify-center py-20">
-      <LoadingSpinner size="lg" message="Cargando análisis..." />
+      <LoadingSpinner size="lg" message={translations.common.loading} />
     </div>
   {:else if filteredAnalyses.length === 0}
     <!-- Empty State -->
@@ -251,7 +266,7 @@
           </svg>
         </div>
         <h3 class="text-2xl font-bold text-red-100 mb-2">
-          No se encontraron resultados
+          {translations.results.noResults}
         </h3>
         <p class="text-red-300/70 mb-6">
           {searchQuery
@@ -275,7 +290,7 @@
                 />
               </svg>
             {/snippet}
-            Analizar un video
+            {translations.dashboard.newAnalysis}
           </Button>
         {/if}
       </div>
@@ -324,7 +339,9 @@
                     ? 'bg-blue-500/90 text-white animate-pulse'
                     : 'bg-yellow-500/90 text-black'}"
                 >
-                  {analysis.status === "analyzing" ? "Analizando" : "Detenido"}
+                  {analysis.status === "analyzing"
+                    ? translations.results.analyzing
+                    : translations.results.stopped}
                 </div>
               {/if}
 
@@ -418,7 +435,9 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="text-xs text-red-300/60">Modelo</p>
+                    <p class="text-xs text-red-300/60">
+                      {translations.results.modelUsed}
+                    </p>
                     <p class="font-semibold text-red-100">{analysis.model}</p>
                   </div>
                 </div>
@@ -471,7 +490,7 @@
               disabled={!!(analysis.status && analysis.status !== "complete")}
               onclick={() => handleCardClick(analysis.id)}
             >
-              Ver detalles
+              {translations.results.viewDetails}
             </Button>
 
             <Button
@@ -480,7 +499,7 @@
               class="flex-1"
               onclick={(e) => handleRestart(analysis, e)}
             >
-              🔄 Reiniciar
+              🔄 {translations.results.restart}
             </Button>
 
             <Button

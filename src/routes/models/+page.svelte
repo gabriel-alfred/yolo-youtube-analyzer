@@ -12,6 +12,9 @@
     loadModelsConfig,
     applyConfigToModels,
   } from "$lib/config";
+  import { t } from "$lib/i18n";
+
+  let translations = $derived($t);
 
   // Clases COCO
   const COCO_CLASSES = [
@@ -125,7 +128,7 @@
       fileName: "yolo11n.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11n.pt`,
       size: "2.6 MB",
-      speed: "Muy rápida",
+      speed: "veryFast",
       precision: "~39% mAP",
       downloaded: false,
       active: false,
@@ -141,7 +144,7 @@
       fileName: "yolo11s.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11s.pt`,
       size: "9.4 MB",
-      speed: "Rápida",
+      speed: "fast",
       precision: "~47% mAP",
       downloaded: false,
       active: false,
@@ -157,7 +160,7 @@
       fileName: "yolo11m.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11m.pt`,
       size: "20.1 MB",
-      speed: "Media",
+      speed: "medium",
       precision: "~51% mAP",
       downloaded: false,
       active: false,
@@ -173,7 +176,7 @@
       fileName: "yolo11l.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11l.pt`,
       size: "25.3 MB",
-      speed: "Lenta",
+      speed: "slow",
       precision: "~53% mAP",
       downloaded: false,
       active: false,
@@ -189,7 +192,7 @@
       fileName: "yolo11x.pt",
       downloadUrl: `${YOLO_MODELS_BASE_URL}/yolo11x.pt`,
       size: "56.9 MB",
-      speed: "Muy lenta",
+      speed: "verySlow",
       precision: "~54% mAP",
       downloaded: false,
       active: false,
@@ -417,7 +420,7 @@
           fileName: fileName,
           downloadUrl: "",
           size: sizeStr,
-          speed: "Desconocida",
+          speed: "unknown",
           precision: "Por determinar",
           downloaded: true,
           active: false,
@@ -488,7 +491,7 @@
       fileName: file.name,
       downloadUrl: "",
       size: formatBytes(file.size),
-      speed: "Desconocida",
+      speed: "unknown",
       precision: "Por determinar",
       downloaded: true,
       active: false,
@@ -516,16 +519,15 @@
   <h1
     class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
   >
-    Gestión de Modelos
+    {translations.models.title}
   </h1>
   <p class="text-slate-300 text-lg">
-    Administra y configura los modelos YOLO disponibles
+    {translations.models.subtitle}
   </p>
   {#if modelsDir}
     <p class="text-slate-400 text-sm mt-2">
-      Ubicación: <code class="bg-slate-800/50 px-2 py-1 rounded text-xs"
-        >{modelsDir}</code
-      >
+      {translations.models.location}
+      <code class="bg-slate-800/50 px-2 py-1 rounded text-xs">{modelsDir}</code>
     </p>
   {/if}
 </div>
@@ -561,7 +563,7 @@
             d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
           />
         </svg>
-        Modelos Disponibles
+        {translations.models.available}
       </h2>
     {/snippet}
 
@@ -571,31 +573,31 @@
           <tr>
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Estado</th
+              >{translations.models.headers.state}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Modelo</th
+              >{translations.models.headers.model}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Tamaño</th
+              >{translations.models.headers.size}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Velocidad</th
+              >{translations.models.headers.speed}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Precisión</th
+              >{translations.models.headers.precision}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Clases</th
+              >{translations.models.headers.classes}</th
             >
             <th
               class="px-6 py-3 text-left text-xs font-semibold text-red-300 uppercase tracking-wider"
-              >Acciones</th
+              >{translations.models.headers.actions}</th
             >
           </tr>
         </thead>
@@ -620,14 +622,14 @@
                     <span
                       class="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded-full border border-green-500/30"
                     >
-                      Activo
+                      {translations.models.active}
                     </span>
                   {/if}
                   {#if model.isCustom}
                     <span
                       class="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30"
                     >
-                      Personalizado
+                      {translations.models.badges.custom}
                     </span>
                   {/if}
                 </div>
@@ -636,7 +638,11 @@
                 <span class="text-sm text-red-200">{model.size}</span>
               </td>
               <td class="px-6 py-4">
-                <span class="text-sm text-red-200">{model.speed}</span>
+                <span class="text-sm text-red-200"
+                  >{translations.models.speeds[
+                    model.speed as keyof typeof translations.models.speeds
+                  ] || model.speed}</span
+                >
               </td>
               <td class="px-6 py-4">
                 <span class="text-sm text-red-200">{model.precision}</span>
@@ -705,7 +711,7 @@
                         />
                       </svg>
                     {/snippet}
-                    Eliminar
+                    {translations.models.delete}
                   </Button>
                 {:else}
                   <Button
@@ -728,7 +734,7 @@
                         />
                       </svg>
                     {/snippet}
-                    Descargar
+                    {translations.models.download}
                   </Button>
                 {/if}
               </td>
@@ -929,7 +935,7 @@
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
           />
         </svg>
-        Agregar Modelo Personalizado
+        {translations.models.import.title}
       </h2>
     {/snippet}
 
@@ -972,11 +978,12 @@
         <div>
           <h3 class="text-lg font-semibold text-red-100 mb-2">
             {isDragging
-              ? "Suelta el archivo aquí"
-              : "Haz clic o arrastra tu modelo aquí"}
+              ? translations.models.import.dropHere
+              : translations.models.import.description}
           </h3>
           <p class="text-sm text-red-300/70">
-            Formatos aceptados: .pt (máx. 100MB)
+            {translations.models.import.instructions} ({translations.models
+              .import.maxSize})
           </p>
         </div>
 
@@ -1010,7 +1017,7 @@
             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        Información
+        {translations.analysis.modelInfo}
       </h2>
     {/snippet}
 
@@ -1029,7 +1036,7 @@
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <p>Activa los modelos que desees usar para el análisis de video</p>
+        <p>{translations.analysis.modelInfoDesc1}</p>
       </div>
       <div class="flex items-start gap-2">
         <svg
@@ -1045,7 +1052,7 @@
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <p>Los modelos más pequeños son más rápidos pero menos precisos</p>
+        <p>{translations.analysis.modelInfoDesc2}</p>
       </div>
       <div class="flex items-start gap-2">
         <svg
@@ -1061,7 +1068,7 @@
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <p>Configura las clases específicas que cada modelo debe detectar</p>
+        <p>{translations.analysis.modelInfoDesc3}</p>
       </div>
       <div class="flex items-start gap-2">
         <svg
@@ -1078,7 +1085,7 @@
           />
         </svg>
         <p>
-          Puedes agregar modelos personalizados arrastrándolos al área indicada
+          {translations.analysis.modelInfoDesc4}
         </p>
       </div>
     </div>
@@ -1122,7 +1129,9 @@
             </svg>
           </div>
           <div>
-            <h3 class="text-xl font-bold text-red-100">Clases a Detectar</h3>
+            <h3 class="text-xl font-bold text-red-100">
+              {translations.models.classesModal.title}
+            </h3>
             <p class="text-sm text-red-300/70">{currentModelForClasses.name}</p>
           </div>
         </div>
@@ -1154,17 +1163,19 @@
         >
           <div class="flex items-center justify-between gap-4">
             <div class="text-sm text-red-300">
-              <span class="font-semibold text-red-100"
-                >{getSelectedClassesCount(currentModelForClasses)}</span
-              >
-              de <span class="font-medium">{COCO_CLASSES.length}</span> seleccionadas
+              {translations.models.classesModal.status
+                .replace(
+                  "{count}",
+                  getSelectedClassesCount(currentModelForClasses).toString(),
+                )
+                .replace("{total}", COCO_CLASSES.length.toString())}
             </div>
             <Button variant="ghost" size="sm" onclick={toggleAllClasses}>
               {Object.values(currentModelForClasses.selectedClasses).every(
                 (v) => v,
               )
-                ? "Deseleccionar Todo"
-                : "Seleccionar Todo"}
+                ? translations.models.classesModal.deselectAll
+                : translations.models.classesModal.selectAll}
             </Button>
           </div>
         </div>
@@ -1215,7 +1226,7 @@
               />
             </svg>
           {/snippet}
-          Guardar y Cerrar
+          {translations.models.classesModal.saveAndClose}
         </Button>
       </div>
     </div>
@@ -1226,12 +1237,18 @@
 <ConfirmationDialog
   bind:open={deleteDialogOpen}
   variant="danger"
-  title="¿Eliminar modelo?"
-  message="Esta acción eliminará el modelo {modelToDelete?.name} de tu sistema. {modelToDelete?.isCustom
-    ? 'El modelo personalizado se eliminará permanentemente.'
-    : 'Podrás descargarlo nuevamente si lo necesitas en el futuro.'}"
-  confirmText="Eliminar"
-  cancelText="Cancelar"
+  title={translations.models.deleteDialog.title}
+  message={modelToDelete?.isCustom
+    ? translations.models.deleteDialog.messageCustom.replace(
+        "{name}",
+        modelToDelete?.name || "",
+      )
+    : translations.models.deleteDialog.messageStandard.replace(
+        "{name}",
+        modelToDelete?.name || "",
+      )}
+  confirmText={translations.models.deleteDialog.confirm}
+  cancelText={translations.models.deleteDialog.cancel}
   onConfirm={confirmDelete}
 />
 

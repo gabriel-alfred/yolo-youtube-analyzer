@@ -20,6 +20,9 @@
     type Model,
     COCO_CLASSES,
   } from "$lib/models";
+  import { t } from "$lib/i18n";
+
+  let translations = $derived($t);
 
   // State
   let streamUrl = $state("");
@@ -216,11 +219,23 @@
     // Do NOT stop analysis here, so it persists when switching tabs
   });
 
-  const qualities = [
-    { id: "low", name: "Baja (360p)", fps: "Rápido" },
-    { id: "medium", name: "Media (720p)", fps: "Equilibrado" },
-    { id: "high", name: "Alta (1080p)", fps: "Detallado" },
-  ];
+  let qualities = $derived([
+    {
+      id: "low",
+      name: translations.monitoring.qualities.low,
+      fps: translations.monitoring.qualities.fpsFast,
+    },
+    {
+      id: "medium",
+      name: translations.monitoring.qualities.medium,
+      fps: translations.monitoring.qualities.fpsBalanced,
+    },
+    {
+      id: "high",
+      name: translations.monitoring.qualities.high,
+      fps: translations.monitoring.qualities.fpsDetailed,
+    },
+  ]);
 
   // Use COCO classes from lib
   const availableClasses = COCO_CLASSES;
@@ -293,18 +308,18 @@
   // Functions
   async function handleStartStreaming() {
     if (!streamUrl.trim()) {
-      error = "Por favor ingresa una URL de streaming válida";
+      error = translations.monitoring.errors.invalidUrl;
       return;
     }
 
     if (!selectedModel) {
-      error = "Por favor selecciona un modelo";
+      error = translations.monitoring.errors.selectModel;
       return;
     }
 
     error = "";
     isLoading = true;
-    statusMessage = "Iniciando...";
+    statusMessage = translations.monitoring.status.starting;
     liveFrameData = null;
 
     // Check storage limit before starting
@@ -317,7 +332,10 @@
       if (!canProceed) {
         isLoading = false;
         showConflictDialog = true;
-        error = `Has alcanzado el límite de almacenamiento de ${appConfig.maxStorageSize} GB. Por favor, limpia el almacenamiento en Configuración antes de continuar.`;
+        error = translations.common.storageLimitReached.replace(
+          "{max}",
+          appConfig.maxStorageSize.toString(),
+        );
         return;
       }
     } catch (err) {
@@ -402,10 +420,10 @@
   <h1
     class="text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent mb-4"
   >
-    Monitoreo en Tiempo Real
+    {translations.monitoring.title}
   </h1>
   <p class="text-slate-300 text-lg">
-    Analiza streams en vivo con detección de objetos
+    {translations.monitoring.subtitle}
   </p>
 </div>
 
@@ -421,7 +439,8 @@
             class="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"
           ></div>
           <span class="text-sm font-semibold text-red-100"
-            >EN VIVO {currentFps > 0 ? `(${currentFps} FPS)` : ""} | Buffer: {frameBuffer.length}</span
+            >{translations.monitoring.liveStream.toUpperCase()}
+            {currentFps > 0 ? `(${currentFps} FPS)` : ""} | Buffer: {frameBuffer.length}</span
           >
         </div>
         <Button variant="danger" onclick={handleStopStreaming}>
@@ -434,7 +453,7 @@
               />
             </svg>
           {/snippet}
-          Detener
+          {translations.monitoring.stopMonitoring}
         </Button>
       </div>
     </div>
@@ -447,7 +466,7 @@
         <Input
           bind:value={streamUrl}
           type="url"
-          placeholder="https://www.youtube.com/watch?v=..."
+          placeholder={translations.monitoring.streamPlaceholder}
           disabled={isStreaming || isLoading}
           fullWidth
         >
@@ -485,7 +504,9 @@
               />
             </svg>
           {/snippet}
-          {isLoading ? "Conectando..." : "Iniciar Monitoreo"}
+          {isLoading
+            ? translations.monitoring.connecting
+            : translations.monitoring.startMonitoring}
         </Button>
       {/if}
     </div>
@@ -523,7 +544,7 @@
             >
               <LoadingSpinner
                 size="xl"
-                message={statusMessage || "Procesando stream..."}
+                message={statusMessage || translations.monitoring.processing}
               />
             </div>
           {:else}
@@ -545,10 +566,10 @@
                 />
               </svg>
               <p class="text-red-100/40 text-lg font-medium">
-                Sin transmisión activa
+                {translations.monitoring.noStream}
               </p>
               <p class="text-red-100/30 text-sm mt-2">
-                Configura los parámetros e inicia el monitoreo
+                {translations.monitoring.noStreamDesc}
               </p>
             </div>
           {/if}
@@ -558,25 +579,33 @@
         <div class="p-4 bg-slate-900/50 border-t border-red-500/20">
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
-              <p class="text-xs text-red-100/60 mb-1">Modelo</p>
+              <p class="text-xs text-red-100/60 mb-1">
+                {translations.monitoring.model}
+              </p>
               <p class="text-sm font-semibold text-red-100">
                 {selectedModel || "-"}
               </p>
             </div>
             <div>
-              <p class="text-xs text-red-100/60 mb-1">Dispositivo</p>
+              <p class="text-xs text-red-100/60 mb-1">
+                {translations.monitoring.device}
+              </p>
               <p class="text-sm font-semibold text-red-100 uppercase">
                 {selectedDevice}
               </p>
             </div>
             <div>
-              <p class="text-xs text-red-100/60 mb-1">Confianza</p>
+              <p class="text-xs text-red-100/60 mb-1">
+                {translations.monitoring.confidence}
+              </p>
               <p class="text-sm font-semibold text-red-100">
                 {(confidenceThreshold * 100).toFixed(0)}%
               </p>
             </div>
             <div>
-              <p class="text-xs text-red-100/60 mb-1">Detecciones</p>
+              <p class="text-xs text-red-100/60 mb-1">
+                {translations.monitoring.detections}
+              </p>
               <p class="text-sm font-semibold text-red-100">
                 {currentDetections.length > 0 ? currentDetections.length : "-"}
               </p>
@@ -605,7 +634,7 @@
                   d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                 />
               </svg>
-              Clases de Objetos
+              {translations.monitoring.objectClasses}
             </h3>
             <div class="flex gap-2">
               <button
@@ -613,14 +642,14 @@
                 disabled={isStreaming}
                 class="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
               >
-                Todas
+                {translations.monitoring.all}
               </button>
               <button
                 onclick={clearAllClasses}
                 disabled={isStreaming}
                 class="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
               >
-                Ninguna
+                {translations.monitoring.none}
               </button>
             </div>
           </div>
@@ -667,7 +696,7 @@
                 d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
               />
             </svg>
-            Dispositivo
+            {translations.monitoring.device}
           </h3>
         {/snippet}
 
@@ -676,17 +705,17 @@
           disabled={isStreaming}
           class="w-full px-3 py-2.5 bg-slate-900/60 border border-red-500/30 rounded-lg text-red-100 hover:border-red-500/50 focus:border-red-500 transition-all focus:outline-none disabled:opacity-50"
         >
-          <option value="cpu">CPU (Compatible)</option>
-          <option value="cuda">GPU NVIDIA (CUDA)</option>
-          <option value="mps">GPU Apple (MPS)</option>
+          <option value="cpu">{translations.settings.cpu}</option>
+          <option value="cuda">{translations.settings.gpu}</option>
+          <option value="mps">{translations.settings.mac}</option>
         </select>
         <p class="text-xs text-red-300/60 mt-2">
           {#if selectedDevice === "cpu"}
-            Más lento, pero funciona en todos los equipos.
+            {translations.monitoring.deviceInfo.cpu}
           {:else if selectedDevice === "cuda"}
-            Requiere tarjeta NVIDIA y drivers CUDA.
+            {translations.monitoring.deviceInfo.cuda}
           {:else if selectedDevice === "mps"}
-            Optimizado para Mac con Apple Silicon.
+            {translations.monitoring.deviceInfo.mps}
           {/if}
         </p>
       </Card>
@@ -710,7 +739,7 @@
                 d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
               />
             </svg>
-            Modelo YOLO
+            {translations.monitoring.yoloModel}
           </h3>
         {/snippet}
 
@@ -719,8 +748,7 @@
             <div
               class="p-4 text-center text-red-300/60 text-sm bg-slate-800/30 rounded-lg border border-red-500/10"
             >
-              No hay modelos descargados. Ve a la pestaña Modelos para descargar
-              uno.
+              {translations.monitoring.noModels}
             </div>
           {:else}
             {#each availableModels as model}
@@ -780,7 +808,7 @@
                 d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
               />
             </svg>
-            Calidad del Stream
+            {translations.monitoring.streamQuality}
           </h3>
         {/snippet}
 
@@ -839,13 +867,15 @@
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
-            Umbral de Confianza
+            {translations.monitoring.confidenceThreshold}
           </h3>
         {/snippet}
 
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-red-100/80">Mínimo</span>
+            <span class="text-sm text-red-100/80"
+              >{translations.monitoring.minimum}</span
+            >
             <span class="text-lg font-bold text-red-100"
               >{(confidenceThreshold * 100).toFixed(0)}%</span
             >

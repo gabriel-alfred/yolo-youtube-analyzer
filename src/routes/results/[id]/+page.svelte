@@ -6,6 +6,9 @@
     import LoadingSpinner from "$lib/components/ui/LoadingSpinner.svelte";
     import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
     import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+    import { t } from "$lib/i18n";
+
+    let translations = $derived($t);
 
     interface Detection {
         frameNumber: number;
@@ -58,7 +61,7 @@
             analysis = await invoke("get_analysis_result", { id });
         } catch (e) {
             console.error("Error loading analysis:", e);
-            error = "Análisis no encontrado o error al cargar";
+            error = translations.results.details.error;
         } finally {
             loading = false;
         }
@@ -165,14 +168,17 @@
 
 {#if loading}
     <div class="flex items-center justify-center min-h-[60vh]">
-        <LoadingSpinner size="lg" message="Cargando análisis..." />
+        <LoadingSpinner
+            size="lg"
+            message={translations.results.details.loading}
+        />
     </div>
 {:else if error || !analysis}
     <div class="max-w-2xl mx-auto mt-12">
         <ErrorMessage
             variant="error"
             title="Error"
-            message={error || "No se pudo cargar el análisis"}
+            message={error || translations.results.details.error}
         >
             {#snippet actions()}
                 <Button
@@ -195,7 +201,7 @@
                             />
                         </svg>
                     {/snippet}
-                    Volver a resultados
+                    {translations.results.details.back}
                 </Button>
             {/snippet}
         </ErrorMessage>
@@ -224,7 +230,7 @@
                     />
                 </svg>
             {/snippet}
-            Volver a resultados
+            {translations.results.details.back}
         </Button>
 
         <div
@@ -283,7 +289,8 @@
                                 d="M13 10V3L4 14h7v7l9-11h-7z"
                             />
                         </svg>
-                        Procesado en {analysis.processingTime}
+                        {translations.results.details.processedIn}
+                        {analysis.processingTime}
                     </span>
                 </div>
             </div>
@@ -383,7 +390,7 @@
                             {analysis.totalObjects.toLocaleString()}
                         </p>
                         <p class="text-sm text-red-300/70">
-                            Objetos detectados
+                            {translations.results.details.objectsDetected}
                         </p>
                     </div>
                 </div>
@@ -412,7 +419,9 @@
                         <p class="text-3xl font-bold text-red-100">
                             {analysis.detectedClasses.length}
                         </p>
-                        <p class="text-sm text-red-300/70">Clases únicas</p>
+                        <p class="text-sm text-red-300/70">
+                            {translations.results.details.uniqueClasses}
+                        </p>
                     </div>
                 </div>
             </Card>
@@ -440,7 +449,9 @@
                         <p class="text-3xl font-bold text-red-100">
                             {analysis.model}
                         </p>
-                        <p class="text-sm text-red-300/70">Modelo YOLO</p>
+                        <p class="text-sm text-red-300/70">
+                            {translations.results.details.yoloModel}
+                        </p>
                     </div>
                 </div>
             </Card>
@@ -468,7 +479,9 @@
                         <p class="text-3xl font-bold text-red-100">
                             {(analysis.minConfidence * 100).toFixed(0)}%
                         </p>
-                        <p class="text-sm text-red-300/70">Confianza mínima</p>
+                        <p class="text-sm text-red-300/70">
+                            {translations.results.details.minConfidence}
+                        </p>
                     </div>
                 </div>
             </Card>
@@ -483,7 +496,7 @@
                     ? 'text-red-100'
                     : 'text-red-300/60 hover:text-red-300'}"
             >
-                Vista General
+                {translations.results.details.tabs.overview}
                 {#if selectedTab === "overview"}
                     <div
                         class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-500 to-orange-500"
@@ -497,7 +510,8 @@
                     ? 'text-red-100'
                     : 'text-red-300/60 hover:text-red-300'}"
             >
-                Detecciones ({analysis.detections.length})
+                {translations.results.details.tabs.detections} ({analysis
+                    .detections.length})
                 {#if selectedTab === "detections"}
                     <div
                         class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-500 to-orange-500"
@@ -534,7 +548,7 @@
                                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                                 />
                             </svg>
-                            Configuración del Análisis
+                            {translations.results.details.analysisConfig}
                         </h3>
                     {/snippet}
 
@@ -542,7 +556,9 @@
                         <div
                             class="flex justify-between items-center py-2 border-b border-red-500/10"
                         >
-                            <span class="text-red-300/70">Calidad de video</span
+                            <span class="text-red-300/70"
+                                >{translations.results.details
+                                    .videoQuality}</span
                             >
                             <span class="font-semibold text-red-100"
                                 >{analysis.quality}</span
@@ -552,7 +568,8 @@
                             class="flex justify-between items-center py-2 border-b border-red-500/10"
                         >
                             <span class="text-red-300/70"
-                                >Frames por segundo</span
+                                >{translations.results.details
+                                    .framesPerSecond}</span
                             >
                             <span class="font-semibold text-red-100"
                                 >{analysis.fps} FPS</span
@@ -562,7 +579,8 @@
                             class="flex justify-between items-center py-2 border-b border-red-500/10"
                         >
                             <span class="text-red-300/70"
-                                >Intervalo de análisis</span
+                                >{translations.results.details
+                                    .analysisInterval}</span
                             >
                             <span class="font-semibold text-red-100"
                                 >Cada {analysis.framesInterval} frames</span
@@ -581,7 +599,8 @@
                         </div>
                         <div class="flex justify-between items-center py-2">
                             <span class="text-red-300/70"
-                                >Tiempo de procesamiento</span
+                                >{translations.results.details
+                                    .processingTime}</span
                             >
                             <span class="font-semibold text-red-100"
                                 >{analysis.processingTime}</span
@@ -609,7 +628,7 @@
                                     d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                                 />
                             </svg>
-                            Estadísticas por Clase
+                            {translations.results.details.classStats}
                         </h3>
                     {/snippet}
 
@@ -627,7 +646,8 @@
                                         >{stat.class}</span
                                     >
                                     <span class="text-sm text-red-300/70"
-                                        >{stat.count} detecciones</span
+                                        >{stat.count}
+                                        {translations.results.details.tabs.detections.toLowerCase()}</span
                                     >
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -658,14 +678,16 @@
             <Card variant="default" padding="lg">
                 <!-- Filter -->
                 <div class="mb-6 flex items-center gap-3">
-                    <span class="text-sm text-red-300">Filtrar por clase:</span>
+                    <span class="text-sm text-red-300"
+                        >{translations.results.details.filterByClass}</span
+                    >
                     <select
                         bind:value={classFilter}
                         class="px-4 py-2 bg-slate-900/60 border border-red-500/30 rounded-lg text-red-50 focus:border-red-500 focus:outline-none transition-all"
                     >
                         <option value="all"
-                            >Todas las clases ({analysis.detections
-                                .length})</option
+                            >{translations.results.details.allClasses} ({analysis
+                                .detections.length})</option
                         >
                         {#each analysis.detectedClasses as className}
                             <option value={className}>
@@ -686,23 +708,28 @@
                             <tr>
                                 <th
                                     class="px-4 py-3 text-left text-xs font-semibold text-red-300 uppercase"
-                                    >Frame</th
+                                    >{translations.results.details.table
+                                        .frame}</th
                                 >
                                 <th
                                     class="px-4 py-3 text-left text-xs font-semibold text-red-300 uppercase"
-                                    >Tiempo</th
+                                    >{translations.results.details.table
+                                        .time}</th
                                 >
                                 <th
                                     class="px-4 py-3 text-left text-xs font-semibold text-red-300 uppercase"
-                                    >Clase</th
+                                    >{translations.results.details.table
+                                        .class}</th
                                 >
                                 <th
                                     class="px-4 py-3 text-left text-xs font-semibold text-red-300 uppercase"
-                                    >Confianza</th
+                                    >{translations.results.details.table
+                                        .confidence}</th
                                 >
                                 <th
                                     class="px-4 py-3 text-left text-xs font-semibold text-red-300 uppercase"
-                                    >Posición</th
+                                    >{translations.results.details.table
+                                        .position}</th
                                 >
                             </tr>
                         </thead>

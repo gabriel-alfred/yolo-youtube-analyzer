@@ -41,3 +41,36 @@ export function applyConfigToModels(models: Model[], config: ModelConfig[]): Mod
         return m;
     });
 }
+
+// Global App Config
+const APP_CONFIG_KEY = 'yolo_app_config';
+
+export interface AppConfig {
+    processingDevice: 'cpu' | 'cuda' | 'mps';
+    language: string;
+    compressResults: boolean;
+    maxStorageSize: number;
+}
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+    processingDevice: 'cpu',
+    language: 'es',
+    compressResults: true,
+    maxStorageSize: 50
+};
+
+export function saveAppConfig(config: AppConfig) {
+    localStorage.setItem(APP_CONFIG_KEY, JSON.stringify(config));
+}
+
+export function loadAppConfig(): AppConfig {
+    const stored = localStorage.getItem(APP_CONFIG_KEY);
+    if (!stored) return DEFAULT_APP_CONFIG;
+    try {
+        const parsed = JSON.parse(stored);
+        return { ...DEFAULT_APP_CONFIG, ...parsed }; // Merge with defaults to ensure all fields exist
+    } catch (e) {
+        console.error("Failed to parse app config", e);
+        return DEFAULT_APP_CONFIG;
+    }
+}

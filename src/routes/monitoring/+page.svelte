@@ -8,7 +8,11 @@
   import LoadingSpinner from "$lib/components/ui/LoadingSpinner.svelte";
   import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
-  import { loadModelsConfig, applyConfigToModels } from "$lib/config";
+  import {
+    loadModelsConfig,
+    applyConfigToModels,
+    loadAppConfig,
+  } from "$lib/config";
   import {
     DEFAULT_MODELS,
     getDownloadedModels,
@@ -63,6 +67,10 @@
 
   async function loadModels() {
     try {
+      // Load app config
+      const appConfig = loadAppConfig();
+      selectedDevice = appConfig.processingDevice;
+
       const downloaded = await getDownloadedModels();
       let currentModels = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
 
@@ -100,6 +108,15 @@
   function handleStorageEvent(e: StorageEvent) {
     if (e.key === "yolo_model_config") {
       loadModels();
+    } else if (e.key === "yolo_app_config" && e.newValue) {
+      try {
+        const newConfig = JSON.parse(e.newValue);
+        if (newConfig.processingDevice) {
+          selectedDevice = newConfig.processingDevice;
+        }
+      } catch (err) {
+        console.error("Error parsing app config update:", err);
+      }
     }
   }
 
@@ -289,6 +306,23 @@
     isLoading = true;
     statusMessage = "Iniciando...";
     liveFrameData = null;
+
+    // Check storage limit before starting
+    try {
+      const appConfig = loadAppConfig();
+      const canProceed = await invoke<boolean>("check_storage_limit", {
+        maxStorageGb: appConfig.maxStorageSize,
+      });
+
+      if (!canProceed) {
+        isLoading = false;
+        showConflictDialog = true;
+        error = `Has alcanzado el límite de almacenamiento de ${appConfig.maxStorageSize} GB. Por favor, limpia el almacenamiento en Configuración antes de continuar.`;
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking storage limit:", err);
+    }
 
     try {
       // Convert class names to indices

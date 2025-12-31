@@ -8,7 +8,11 @@
   import Card from "$lib/components/ui/Card.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
-  import { loadModelsConfig, applyConfigToModels } from "$lib/config";
+  import {
+    loadModelsConfig,
+    applyConfigToModels,
+    loadAppConfig,
+  } from "$lib/config";
   import {
     COCO_CLASSES,
     DEFAULT_MODELS,
@@ -122,8 +126,12 @@
     }
   }
 
-  onMount(async () => {
-    await loadModels();
+  onMount(() => {
+    loadModels();
+
+    // Load app config
+    const appConfig = loadAppConfig();
+    selectedDevice = appConfig.processingDevice;
 
     // Listen for config changes
     window.addEventListener("storage", handleStorageEvent);
@@ -138,6 +146,15 @@
   function handleStorageEvent(e: StorageEvent) {
     if (e.key === "yolo_model_config") {
       loadModels();
+    } else if (e.key === "yolo_app_config" && e.newValue) {
+      try {
+        const newConfig = JSON.parse(e.newValue);
+        if (newConfig.processingDevice) {
+          selectedDevice = newConfig.processingDevice;
+        }
+      } catch (err) {
+        console.error("Error parsing app config update:", err);
+      }
     }
   }
 
@@ -197,6 +214,27 @@
     currentFrameNumber = 0;
     liveFrameData = null;
 
+    // Check storage limit before starting
+    try {
+      const appConfig = loadAppConfig();
+      const canProceed = await invoke<boolean>("check_storage_limit", {
+        maxStorageGb: appConfig.maxStorageSize,
+      });
+
+      if (!canProceed) {
+        analyzing = false;
+        showLivePlayer = false;
+        showConflictDialog = true;
+        conflictDialogMessage = `Has alcanzado el límite de almacenamiento de ${appConfig.maxStorageSize} GB. Por favor, limpia el almacenamiento en Configuración antes de continuar.`;
+        conflictDialogConfirmText = "Entendido";
+        conflictDialogVariant = "warning";
+        conflictDialogCancelText = "";
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking storage limit:", error);
+    }
+
     try {
       // Construir string de clases (índices separados por coma)
       const classesToDetectIndices = Object.entries(selectedClasses)
@@ -231,6 +269,9 @@
       // Descarga de modelo si es necesario (ya manejado en backend pero bueno verificar)
       // ...
 
+      // Load app config to get settings
+      const appConfig = loadAppConfig();
+
       await invoke("start_video_analysis", {
         url: youtubeUrl,
         modelName: modelFileName,
@@ -240,6 +281,8 @@
         device: selectedDevice,
         frames: frames,
         quality: quality,
+        keepOriginal: false,
+        compress: appConfig.compressResults,
       });
 
       // Only now enables the listener and player

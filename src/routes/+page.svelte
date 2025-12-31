@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import { goto } from "$app/navigation";
+  import { invoke, convertFileSrc } from "@tauri-apps/api/core";
   import Card from "$lib/components/ui/Card.svelte";
   import { t } from "$lib/i18n";
+  import Button from "$lib/components/ui/Button.svelte";
 
   // Reactive translations
   let translations = $derived($t);
@@ -14,6 +17,65 @@
   let targetInterval: any;
   let scanPhase = $state(0);
   let isVerticalLayout = $state(false);
+
+  // Analysis Data
+  interface VideoAnalysis {
+    id: string;
+    videoUrl: string;
+    thumbnail: string;
+    title: string;
+    duration: string;
+    analyzedDate: string;
+    totalObjects: number;
+    detectedClasses: string[];
+    model: string;
+    quality: string;
+    framesInterval: number;
+    minConfidence: number;
+    processingTime: string;
+    resultPath: string;
+  }
+
+  let recentAnalyses = $state<VideoAnalysis[]>([]);
+  let loadingAnalyses = $state(true);
+
+  async function loadRecentAnalyses() {
+    try {
+      loadingAnalyses = true;
+      const allAnalyses = await invoke<VideoAnalysis[]>(
+        "get_all_analysis_results",
+      );
+
+      // Sort by date (descending) and take top 6
+      recentAnalyses = allAnalyses
+        .sort(
+          (a, b) =>
+            new Date(b.analyzedDate).getTime() -
+            new Date(a.analyzedDate).getTime(),
+        )
+        .slice(0, 6);
+    } catch (error) {
+      console.error("Error loading recent analyses:", error);
+    } finally {
+      loadingAnalyses = false;
+    }
+  }
+
+  function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Hoy";
+    if (diffDays === 1) return "Ayer";
+    if (diffDays < 7) return `Hace ${diffDays} días`;
+
+    return date.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+    });
+  }
 
   function checkLayout() {
     isVerticalLayout = window.innerWidth < 1024;
@@ -59,6 +121,9 @@
   }
 
   onMount(() => {
+    // Cargar análisis recientes
+    loadRecentAnalyses();
+
     // Verificar el layout inicial
     checkLayout();
 
@@ -457,7 +522,7 @@
     </div>
   </div>
 
-  <!-- Dashboard de Análisis Fijados -->
+  <!-- Dashboard de Análisis Recientes -->
   <div class="w-full max-w-7xl mt-16 mb-12">
     <div class="text-center mb-8">
       <h2 class="text-3xl font-bold text-orange-500 mb-2">
@@ -468,45 +533,176 @@
       </p>
     </div>
 
-    <!-- Grid de 2 filas x 3 columnas -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {#each Array(6) as _, i}
-        <Card variant="glass" padding="md" hoverable={true}>
-          <div class="space-y-3">
-            <!-- Área de video/placeholder -->
-            <div
-              class="relative aspect-video rounded-lg overflow-hidden border border-orange-500/20 bg-slate-900/50 flex items-center justify-center group cursor-pointer hover:border-orange-500/50 transition-colors"
+    <!-- Grid de resultados recientes -->
+    {#if loadingAnalyses}
+      <div class="flex justify-center py-12">
+        <p class="text-orange-400 animate-pulse">
+          {translations.common.loading}
+        </p>
+      </div>
+    {:else if recentAnalyses.length === 0}
+      <!-- Empty State -->
+      <Card variant="glass" padding="lg">
+        <div class="text-center py-12">
+          <div
+            class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/50 flex items-center justify-center border border-orange-500/20"
+          >
+            <svg
+              class="w-8 h-8 text-slate-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <div class="text-center">
-                <svg
-                  class="w-12 h-12 text-orange-500/30 mx-auto mb-2 group-hover:text-orange-500/50 transition-colors"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                <p
-                  class="text-xs text-slate-500 group-hover:text-slate-400 transition-colors"
-                >
-                  {translations.dashboard.addAnalysis}
-                </p>
-              </div>
-            </div>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
           </div>
-        </Card>
-      {/each}
-    </div>
+          <h3 class="text-xl font-bold text-orange-100 mb-2">
+            {translations.dashboard.noRecentAnalysis}
+          </h3>
+          <p class="text-slate-400 mb-6">
+            Realiza tu primer análisis para verlo aquí.
+          </p>
+          <Button variant="primary" onclick={() => goto("/analysis")}>
+            {translations.dashboard.newAnalysis}
+          </Button>
+        </div>
+      </Card>
+    {:else}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {#each recentAnalyses as analysis}
+          <Card
+            variant="glass"
+            padding="none"
+            hoverable={true}
+            class="cursor-pointer group overflow-hidden"
+          >
+            <button
+              onclick={() => goto(`/results/${analysis.id}`)}
+              class="w-full text-left"
+            >
+              <!-- Thumbnail area -->
+              <div class="relative w-full aspect-video overflow-hidden">
+                <img
+                  src={analysis.thumbnail}
+                  alt={analysis.title}
+                  class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  onerror={(e) => {
+                    // Fallback para thumbnails rotos
+                    (e.currentTarget as HTMLImageElement).src =
+                      `https://img.youtube.com/vi/defaults/mqdefault.jpg`;
+                  }}
+                />
+
+                <!-- Overlay gradiente -->
+                <div
+                  class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent"
+                ></div>
+
+                <!-- Badges encima de la imagen -->
+                <div
+                  class="absolute top-2 right-2 px-2 py-1 bg-slate-950/80 backdrop-blur rounded text-xs font-semibold text-orange-200 border border-orange-500/20"
+                >
+                  {formatDate(analysis.analyzedDate)}
+                </div>
+
+                <!-- Play/View icon on hover -->
+                <div
+                  class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                >
+                  <div
+                    class="w-12 h-12 rounded-full bg-orange-500/90 flex items-center justify-center shadow-lg shadow-orange-500/40"
+                  >
+                    <svg
+                      class="w-6 h-6 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content -->
+              <div class="p-4 space-y-2">
+                <h3
+                  class="font-bold text-orange-50 line-clamp-1 group-hover:text-orange-400 transition-colors"
+                  title={analysis.title}
+                >
+                  {analysis.title}
+                </h3>
+
+                <div
+                  class="flex items-center justify-between text-xs text-slate-400"
+                >
+                  <div class="flex items-center gap-1">
+                    <svg
+                      class="w-3.5 h-3.5 text-orange-500/70"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                      />
+                    </svg>
+                    <span>{analysis.totalObjects} detectados</span>
+                  </div>
+
+                  <div class="flex items-center gap-1">
+                    <svg
+                      class="w-3.5 h-3.5 text-slate-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span>{analysis.duration}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </Card>
+        {/each}
+      </div>
+    {/if}
   </div>
 </div>
 
 <style>
   .eye-part {
     transition: all 0.15s ease-in-out;
+  }
+  .line-clamp-1 {
+    display: -webkit-box;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 </style>

@@ -51,9 +51,9 @@ export const es: Translations = {
         noRecentAnalysis: 'No hay análisis recientes',
         favoriteAnalysis: 'Análisis Favoritos',
         addAnalysis: 'Añadir análisis',
-        dashboardTitle: 'Dashboard de Análisis',
-        dashboardSubtitle: 'Selecciona y fija tus análisis favoritos para acceso rápido',
-        noFavorites: 'No hay favoritos guardados',
+        dashboardTitle: 'Análisis Recientes',
+        dashboardSubtitle: 'Tus últimos análisis realizados y detectados',
+        noFavorites: 'No hay análisis recientes',
         stats: {
             totalAnalysis: 'Total de Análisis',
             activeModels: 'Modelos Activos',

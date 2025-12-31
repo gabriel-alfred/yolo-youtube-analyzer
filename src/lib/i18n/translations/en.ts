@@ -51,9 +51,9 @@ export const en: Translations = {
         noRecentAnalysis: 'No recent analysis',
         favoriteAnalysis: 'Favorite Analysis',
         addAnalysis: 'Add analysis',
-        dashboardTitle: 'Analysis Dashboard',
-        dashboardSubtitle: 'Select and pin your favorite analyses for quick access',
-        noFavorites: 'No saved favorites',
+        dashboardTitle: 'Recent Analyses',
+        dashboardSubtitle: 'Your detected latest analyses',
+        noFavorites: 'No recent analyses',
         stats: {
             totalAnalysis: 'Total Analysis',
             activeModels: 'Active Models',

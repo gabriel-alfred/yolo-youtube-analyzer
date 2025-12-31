@@ -25,6 +25,8 @@ def parse_arguments():
     parser.add_argument('--device', type=str, default='cpu', help='Device (cpu, cuda, mps, etc)')
     parser.add_argument('--frames', type=int, default=1, help='Process every N frames')
     parser.add_argument('--quality', type=int, default=80, help='Output quality (50-100)')
+    parser.add_argument('--keep_original', action='store_true', help='Keep original downloaded video')
+    parser.add_argument('--compress', action='store_true', help='Use higher compression for smaller file size')
     return parser.parse_args()
 
 def validate_device(device_str):
@@ -106,7 +108,7 @@ def check_ffmpeg():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
-def save_analysis_metadata(output_path, metadata, stats, config):
+def save_analysis_metadata(output_path, metadata, stats, config, original_path=None):
     """Guarda los metadatos del análisis en un archivo JSON"""
     json_path = os.path.splitext(output_path)[0] + '.json'
     
@@ -130,12 +132,16 @@ def save_analysis_metadata(output_path, metadata, stats, config):
         'status': stats.get('status', 'complete')
     }
     
+    # Add original path if it exists
+    if original_path:
+        analysis_data['originalPath'] = original_path
+    
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(analysis_data, f, indent=2, ensure_ascii=False)
         
     return json_path
 
-def analyze_video(video_path, model_path, output_dir, conf, classes, device, frames_skip, quality, metadata):
+def analyze_video(video_path, model_path, output_dir, conf, classes, device, frames_skip, quality, metadata, compress=False):
     """Analiza un video con YOLO con streaming de frames"""
     start_time = time.time()
     try:
@@ -391,14 +397,24 @@ def analyze_video(video_path, model_path, output_dir, conf, classes, device, fra
         if use_ffmpeg:
             try:
                 emit_progress("info", message="Codificando video con FFmpeg...")
+                
+                # Adjust compression based on compress flag
+                if compress:
+                    crf_value = '28'  # Higher CRF = more compression, smaller file
+                    preset = 'slow'   # Slower preset = better compression
+                    emit_progress("info", message="Usando compresión alta para reducir tamaño")
+                else:
+                    crf_value = '23'  # Default quality
+                    preset = 'medium'
+                
                 cmd = [
                     'ffmpeg',
                     '-y',  # Sobrescribir
                     '-framerate', str(fps),
                     '-i', temp_pattern,
                     '-c:v', 'libx264',
-                    '-preset', 'medium',
-                    '-crf', '23',
+                    '-preset', preset,
+                    '-crf', crf_value,
                     '-pix_fmt', 'yuv420p',
                     '-movflags', '+faststart',  # Importante para reproducción en navegador
                     output_path
@@ -530,8 +546,44 @@ def main():
             validated_device,
             args.frames,
             args.quality,
-            metadata
+            metadata,
+            args.compress  # Pass compress flag
         )
+        
+        # Handle original video based on keep_original flag
+        original_video_path = None
+        if args.keep_original:
+            # Move original video to a permanent location
+            original_filename = f"original_{metadata['video_id']}.mp4"
+            original_video_path = os.path.join(args.output_dir, original_filename)
+            
+            try:
+                shutil.move(video_path, original_video_path)
+                emit_progress("info", message=f"Video original guardado: {original_video_path}")
+            except Exception as e:
+                emit_progress("warning", message=f"No se pudo guardar video original: {str(e)}")
+                original_video_path = None
+        else:
+            # Delete original video to save space
+            try:
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                    emit_progress("info", message="Video original eliminado para ahorrar espacio")
+            except Exception as e:
+                emit_progress("warning", message=f"No se pudo eliminar video original: {str(e)}")
+        
+        # Update metadata with original path if it was saved
+        if original_video_path:
+            # Re-read the metadata JSON and update it
+            json_path = os.path.splitext(output_path)[0] + '.json'
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    analysis_data = json.load(f)
+                analysis_data['originalPath'] = original_video_path
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(analysis_data, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                emit_progress("warning", message=f"No se pudo actualizar metadata con ruta original: {str(e)}")
         
         emit_progress("complete", progress=100, result_path=output_path, message="¡Análisis completado!")
         time.sleep(0.5)

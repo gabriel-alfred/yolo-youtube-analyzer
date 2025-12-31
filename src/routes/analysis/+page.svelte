@@ -7,6 +7,12 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import Input from "$lib/components/ui/Input.svelte";
+  import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
+  import {
+    loadModelsConfig,
+    applyConfigToModels,
+    loadAppConfig,
+  } from "$lib/config";
   import {
     COCO_CLASSES,
     DEFAULT_MODELS,
@@ -45,9 +51,24 @@
   let quality = $state(80);
   let minPrecision = $state(25);
   let selectedDevice = $state("cpu");
+
+  // Initialize with all true, but update via effect
   let selectedClasses = $state<Record<string, boolean>>(
     Object.fromEntries(COCO_CLASSES.map((c) => [c, true])),
   );
+
+  // Effect to sync selectedClasses with the selected model's config
+  $effect(() => {
+    if (selectedModel && models.length > 0) {
+      const model = models.find(
+        (m) => m.name === selectedModel || m.fileName === selectedModel,
+      );
+      if (model) {
+        selectedClasses = { ...model.selectedClasses };
+      }
+    }
+  });
+
   let classColors = $state<Record<string, string>>(
     Object.fromEntries(
       COCO_CLASSES.map((c, i) => [c, PRESET_COLORS[i % PRESET_COLORS.length]]),
@@ -64,6 +85,15 @@
   // Video player en vivo
   let showLivePlayer = $state(false);
   let liveFrameData = $state<string | null>(null);
+  let showConflictDialog = $state(false);
+  let conflictDialogMessage = $state("");
+  let conflictDialogConfirmText = $state("Detener y Continuar");
+  let conflictDialogCancelText = $state("Cancelar");
+  let conflictDialogVariant = $state<"info" | "warning" | "danger" | "success">(
+    "warning",
+  );
+
+  // Buffer y control de fpsntFrameNumber = $state(0);
   let currentFrameNumber = $state(0);
   let analysisComplete = $state(false);
 
@@ -71,10 +101,60 @@
   let unlistenError: (() => void) | null = null;
 
   async function loadModels() {
-    const downloaded = await getDownloadedModels();
-    models = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
-    if (availableModels.length > 0 && !selectedModel) {
-      selectedModel = availableModels[0].name;
+    try {
+      const downloaded = await getDownloadedModels();
+      // Cargar modelos base y marcar descargados
+      let currentModels = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
+
+      // Aplicar configuración guardada
+      const savedConfig = loadModelsConfig();
+      if (savedConfig) {
+        currentModels = applyConfigToModels(currentModels, savedConfig);
+      }
+
+      models = currentModels;
+
+      // Select active model if exists and is downloaded
+      const activeModel = models.find((m) => m.active && m.downloaded);
+      if (activeModel) {
+        selectedModel = activeModel.name;
+      } else if (availableModels.length > 0 && !selectedModel) {
+        selectedModel = availableModels[0].name;
+      }
+    } catch (e) {
+      console.error("Error loading models:", e);
+    }
+  }
+
+  onMount(() => {
+    loadModels();
+
+    // Load app config
+    const appConfig = loadAppConfig();
+    selectedDevice = appConfig.processingDevice;
+
+    // Listen for config changes
+    window.addEventListener("storage", handleStorageEvent);
+    window.addEventListener("focus", loadModels); // Re-check on focus
+
+    return () => {
+      window.removeEventListener("storage", handleStorageEvent);
+      window.removeEventListener("focus", loadModels);
+    };
+  });
+
+  function handleStorageEvent(e: StorageEvent) {
+    if (e.key === "yolo_model_config") {
+      loadModels();
+    } else if (e.key === "yolo_app_config" && e.newValue) {
+      try {
+        const newConfig = JSON.parse(e.newValue);
+        if (newConfig.processingDevice) {
+          selectedDevice = newConfig.processingDevice;
+        }
+      } catch (err) {
+        console.error("Error parsing app config update:", err);
+      }
     }
   }
 
@@ -134,9 +214,30 @@
     currentFrameNumber = 0;
     liveFrameData = null;
 
+    // Check storage limit before starting
+    try {
+      const appConfig = loadAppConfig();
+      const canProceed = await invoke<boolean>("check_storage_limit", {
+        maxStorageGb: appConfig.maxStorageSize,
+      });
+
+      if (!canProceed) {
+        analyzing = false;
+        showLivePlayer = false;
+        showConflictDialog = true;
+        conflictDialogMessage = `Has alcanzado el límite de almacenamiento de ${appConfig.maxStorageSize} GB. Por favor, limpia el almacenamiento en Configuración antes de continuar.`;
+        conflictDialogConfirmText = "Entendido";
+        conflictDialogVariant = "warning";
+        conflictDialogCancelText = "";
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking storage limit:", error);
+    }
+
     try {
       // Construir string de clases (índices separados por coma)
-      const classesToDetect = Object.entries(selectedClasses)
+      const classesToDetectIndices = Object.entries(selectedClasses)
         .filter(([_, selected]) => selected)
         .map(([cls, _]) => COCO_CLASSES.indexOf(cls))
         .join(",");
@@ -149,23 +250,58 @@
         url: youtubeUrl,
         modelName: modelFileName,
         conf: minPrecision / 100.0,
-        classes: classesToDetect,
+        classes: classesToDetectIndices,
         device: selectedDevice,
         frames: frames,
         quality: quality,
       });
 
+      // Resetear todos los estados
+      analysisComplete = false;
+      progress = 0;
+      statusMessage = "Iniciando análisis...";
+      resultPath = null;
+      currentFrameNumber = 0;
+      liveFrameData = null;
+
+      // await checkFileExists(modelFileName); // This function is not defined in the provided code
+
+      // Descarga de modelo si es necesario (ya manejado en backend pero bueno verificar)
+      // ...
+
+      // Load app config to get settings
+      const appConfig = loadAppConfig();
+
       await invoke("start_video_analysis", {
         url: youtubeUrl,
         modelName: modelFileName,
         conf: minPrecision / 100.0,
-        classes: classesToDetect.length > 0 ? classesToDetect : null,
+        classes:
+          classesToDetectIndices.length > 0 ? classesToDetectIndices : null,
         device: selectedDevice,
         frames: frames,
         quality: quality,
+        keepOriginal: false,
+        compress: appConfig.compressResults,
       });
+
+      // Only now enables the listener and player
+      analyzing = true;
+      showLivePlayer = true;
     } catch (error) {
       console.error("Error starting analysis:", error);
+
+      const errorMsg = String(error);
+      if (errorMsg.includes("Ya hay un análisis en curso")) {
+        showConflictDialog = true;
+        conflictDialogMessage =
+          "Ya existe un análisis activo en otra pestaña. Debes detenerlo antes de iniciar uno nuevo.";
+        conflictDialogConfirmText = "Entendido";
+        conflictDialogVariant = "danger";
+        conflictDialogCancelText = "";
+        // alert("⚠️ Ya hay un análisis en curso.\n\nPor favor, detenlo antes de iniciar uno nuevo.");
+      }
+
       statusMessage = `Error: ${error}`;
       analyzing = false;
       showLivePlayer = false;
@@ -201,7 +337,7 @@
 
   async function checkActiveAnalysis() {
     try {
-      const activeSession = await invoke("get_active_analysis");
+      const activeSession = await invoke<any>("get_active_analysis");
       if (activeSession) {
         console.log("Found active session:", activeSession);
         const { config } = activeSession as any;
@@ -276,6 +412,9 @@
     }
 
     unlistenProgress = await listen("analysis-progress", (event: any) => {
+      // Guard: If not strictly analyzing, ignore events (to avoid cross-talk with Live Analysis)
+      if (!analyzing && !analysisComplete) return;
+
       const payload = event.payload;
 
       console.log("Progress event:", payload);

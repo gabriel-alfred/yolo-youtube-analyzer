@@ -517,6 +517,8 @@ async fn start_video_analysis(
     device: String,
     frames: i32,
     quality: i32,
+    keep_original: bool,
+    compress: bool,
 ) -> Result<String, String> {
     // Verificar si ya hay un análisis en curso
     {
@@ -590,6 +592,14 @@ async fn start_video_analysis(
     if let Some(cls) = &classes {
         args.push("--classes".to_string());
         args.push(cls.clone());
+    }
+    
+    if keep_original {
+        args.push("--keep_original".to_string());
+    }
+    
+    if compress {
+        args.push("--compress".to_string());
     }
 
     let mut command = std::process::Command::new(&python_exe);
@@ -779,6 +789,8 @@ pub struct AnalysisResult {
     detections: Vec<Detection>,
     #[serde(default)]
     status: Option<String>,
+    #[serde(default)]
+    original_path: Option<String>,
 }
 
 #[tauri::command]
@@ -840,6 +852,7 @@ fn get_all_analysis_results(app: tauri::AppHandle) -> Result<Vec<AnalysisResult>
                                 fps: 30, // Default
                                 detections: Vec::new(), // Default
                                 status: Some("complete".to_string()),
+                                original_path: None,
                             });
                         }
                     }
@@ -912,11 +925,144 @@ fn get_analysis_result(app: tauri::AppHandle, id: String) -> Result<AnalysisResu
                 fps: 30,
                 detections: Vec::new(),
                 status: Some("complete".to_string()),
+                original_path: None,
             });
         }
     }
 
     Err("Analysis not found".to_string())
+}
+
+#[tauri::command]
+fn delete_analysis_result(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let output_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+    
+    if !output_dir.exists() {
+        return Ok(()); // Nothing to delete
+    }
+    
+    // Delete analyzed video file
+    let video_path = output_dir.join(format!("analyzed_{}.mp4", id));
+    if video_path.exists() {
+        fs::remove_file(&video_path).map_err(|e| e.to_string())?;
+    }
+    
+    // Delete JSON metadata
+    let json_path = output_dir.join(format!("analyzed_{}.json", id));
+    if json_path.exists() {
+        fs::remove_file(&json_path).map_err(|e| e.to_string())?;
+    }
+    
+    // Delete original video if exists
+    let original_path = output_dir.join(format!("original_{}.mp4", id));
+    if original_path.exists() {
+        fs::remove_file(&original_path).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
+// Helper function to calculate directory size
+fn get_directory_size(path: &PathBuf) -> u64 {
+    let mut total_size = 0u64;
+    
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    total_size += metadata.len();
+                } else if metadata.is_dir() {
+                    total_size += get_directory_size(&entry.path());
+                }
+            }
+        }
+    }
+    
+    total_size
+}
+
+#[derive(Serialize)]
+struct StorageUsage {
+    results_size: u64,
+    models_size: u64,
+}
+
+#[tauri::command]
+fn get_storage_usage(app: tauri::AppHandle) -> Result<StorageUsage, String> {
+    // Calculate results directory size
+    let results_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+    
+    let results_size = if results_dir.exists() {
+        get_directory_size(&results_dir)
+    } else {
+        0
+    };
+    
+    // Calculate models directory size
+    let models_dir = resolve_models_dir(&app)?;
+    let models_size = if models_dir.exists() {
+        get_directory_size(&models_dir)
+    } else {
+        0
+    };
+    
+    Ok(StorageUsage {
+        results_size,
+        models_size,
+    })
+}
+
+#[tauri::command]
+fn cleanup_storage(app: tauri::AppHandle) -> Result<(), String> {
+    // Delete all results
+    let results_dir = app.path().download_dir()
+        .map_err(|e| e.to_string())?
+        .join("YoloAnalysis");
+    
+    if results_dir.exists() {
+        // Delete all files in the directory
+        if let Ok(entries) = fs::read_dir(&results_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
+    }
+    
+    // Delete all models
+    let models_dir = resolve_models_dir(&app)?;
+    
+    if models_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&models_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        if ext == "pt" || ext == "onnx" {
+                            let _ = fs::remove_file(&path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn check_storage_limit(app: tauri::AppHandle, max_storage_gb: f64) -> Result<bool, String> {
+    let usage = get_storage_usage(app)?;
+    let total_bytes = usage.results_size + usage.models_size;
+    let total_gb = total_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+    
+    Ok(total_gb < max_storage_gb)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -943,7 +1089,11 @@ pub fn run() {
             stop_video_analysis,
             get_active_analysis,
             get_all_analysis_results,
-            get_analysis_result
+            get_analysis_result,
+            delete_analysis_result,
+            get_storage_usage,
+            cleanup_storage,
+            check_storage_limit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

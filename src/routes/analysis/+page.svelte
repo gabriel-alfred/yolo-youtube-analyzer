@@ -8,6 +8,7 @@
   import Card from "$lib/components/ui/Card.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
+  import { loadModelsConfig, applyConfigToModels } from "$lib/config";
   import {
     COCO_CLASSES,
     DEFAULT_MODELS,
@@ -46,9 +47,24 @@
   let quality = $state(80);
   let minPrecision = $state(25);
   let selectedDevice = $state("cpu");
+
+  // Initialize with all true, but update via effect
   let selectedClasses = $state<Record<string, boolean>>(
     Object.fromEntries(COCO_CLASSES.map((c) => [c, true])),
   );
+
+  // Effect to sync selectedClasses with the selected model's config
+  $effect(() => {
+    if (selectedModel && models.length > 0) {
+      const model = models.find(
+        (m) => m.name === selectedModel || m.fileName === selectedModel,
+      );
+      if (model) {
+        selectedClasses = { ...model.selectedClasses };
+      }
+    }
+  });
+
   let classColors = $state<Record<string, string>>(
     Object.fromEntries(
       COCO_CLASSES.map((c, i) => [c, PRESET_COLORS[i % PRESET_COLORS.length]]),
@@ -66,6 +82,12 @@
   let showLivePlayer = $state(false);
   let liveFrameData = $state<string | null>(null);
   let showConflictDialog = $state(false);
+  let conflictDialogMessage = $state("");
+  let conflictDialogConfirmText = $state("Detener y Continuar");
+  let conflictDialogCancelText = $state("Cancelar");
+  let conflictDialogVariant = $state<"info" | "warning" | "danger" | "success">(
+    "warning",
+  );
 
   // Buffer y control de fpsntFrameNumber = $state(0);
   let currentFrameNumber = $state(0);
@@ -75,10 +97,47 @@
   let unlistenError: (() => void) | null = null;
 
   async function loadModels() {
-    const downloaded = await getDownloadedModels();
-    models = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
-    if (availableModels.length > 0 && !selectedModel) {
-      selectedModel = availableModels[0].name;
+    try {
+      const downloaded = await getDownloadedModels();
+      // Cargar modelos base y marcar descargados
+      let currentModels = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
+
+      // Aplicar configuración guardada
+      const savedConfig = loadModelsConfig();
+      if (savedConfig) {
+        currentModels = applyConfigToModels(currentModels, savedConfig);
+      }
+
+      models = currentModels;
+
+      // Select active model if exists and is downloaded
+      const activeModel = models.find((m) => m.active && m.downloaded);
+      if (activeModel) {
+        selectedModel = activeModel.name;
+      } else if (availableModels.length > 0 && !selectedModel) {
+        selectedModel = availableModels[0].name;
+      }
+    } catch (e) {
+      console.error("Error loading models:", e);
+    }
+  }
+
+  onMount(async () => {
+    await loadModels();
+
+    // Listen for config changes
+    window.addEventListener("storage", handleStorageEvent);
+    window.addEventListener("focus", loadModels); // Re-check on focus
+
+    return () => {
+      window.removeEventListener("storage", handleStorageEvent);
+      window.removeEventListener("focus", loadModels);
+    };
+  });
+
+  function handleStorageEvent(e: StorageEvent) {
+    if (e.key === "yolo_model_config") {
+      loadModels();
     }
   }
 
@@ -140,7 +199,7 @@
 
     try {
       // Construir string de clases (índices separados por coma)
-      const classesToDetect = Object.entries(selectedClasses)
+      const classesToDetectIndices = Object.entries(selectedClasses)
         .filter(([_, selected]) => selected)
         .map(([cls, _]) => COCO_CLASSES.indexOf(cls))
         .join(",");
@@ -153,7 +212,7 @@
         url: youtubeUrl,
         modelName: modelFileName,
         conf: minPrecision / 100.0,
-        classes: classesToDetect,
+        classes: classesToDetectIndices,
         device: selectedDevice,
         frames: frames,
         quality: quality,
@@ -176,7 +235,8 @@
         url: youtubeUrl,
         modelName: modelFileName,
         conf: minPrecision / 100.0,
-        classes: classesToDetect.length > 0 ? classesToDetect : null,
+        classes:
+          classesToDetectIndices.length > 0 ? classesToDetectIndices : null,
         device: selectedDevice,
         frames: frames,
         quality: quality,
@@ -234,7 +294,7 @@
 
   async function checkActiveAnalysis() {
     try {
-      const activeSession = await invoke("get_active_analysis");
+      const activeSession = await invoke<any>("get_active_analysis");
       if (activeSession) {
         console.log("Found active session:", activeSession);
         const { config } = activeSession as any;

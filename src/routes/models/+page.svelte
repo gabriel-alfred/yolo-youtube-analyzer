@@ -7,6 +7,11 @@
   import Card from "$lib/components/ui/Card.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
   import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
+  import {
+    saveModelsConfig,
+    loadModelsConfig,
+    applyConfigToModels,
+  } from "$lib/config";
 
   // Clases COCO
   const COCO_CLASSES = [
@@ -209,6 +214,12 @@
   onMount(async () => {
     await loadDownloadedModels();
 
+    // Cargar configuración persistente
+    const savedConfig = loadModelsConfig();
+    if (savedConfig) {
+      models = applyConfigToModels(models, savedConfig);
+    }
+
     // Escuchar eventos de progreso de descarga
     const unlisten = await listen<{
       model_id: string;
@@ -244,6 +255,12 @@
         model.downloaded = downloadedFiles.includes(model.fileName);
       });
 
+      // Re-apply config just in case
+      const savedConfig = loadModelsConfig();
+      if (savedConfig) {
+        models = applyConfigToModels(models, savedConfig);
+      }
+
       console.log("Modelos descargados:", downloadedFiles);
     } catch (error) {
       console.error("Error verificando modelos:", error);
@@ -260,6 +277,7 @@
         }
       });
       model.active = !model.active;
+      saveModelsConfig(models); // Guardar cambios
     }
   }
 
@@ -273,6 +291,12 @@
       currentModelForClasses.selectedClasses[className] =
         !currentModelForClasses.selectedClasses[className];
     }
+  }
+
+  // Custom save function for the modal
+  function saveClassesChanges() {
+    saveModelsConfig(models);
+    classModalOpen = false;
   }
 
   function toggleAllClasses() {
@@ -309,6 +333,8 @@
       model.downloaded = true;
       model.downloadProgress = undefined;
 
+      saveModelsConfig(models); // Guardar estado descargado (indirectamente útil si active cambia)
+
       console.log(`Modelo ${model.name} descargado exitosamente`);
     } catch (error) {
       console.error("Error descargando modelo:", error);
@@ -331,6 +357,7 @@
       try {
         await invoke("delete_model", { fileName: modelToDelete.fileName });
         models = models.filter((m) => m.id !== modelToDelete.id);
+        saveModelsConfig(models); // Save deletion
       } catch (error) {
         console.error("Error eliminando modelo personalizado:", error);
         downloadError = `Error eliminando modelo: ${error}`;
@@ -341,6 +368,7 @@
         await invoke("delete_model", { fileName: modelToDelete.fileName });
         modelToDelete.downloaded = false;
         modelToDelete.active = false;
+        saveModelsConfig(models); // Save state
       } catch (error) {
         console.error("Error eliminando modelo:", error);
         downloadError = `Error eliminando modelo: ${error}`;
@@ -1171,7 +1199,7 @@
       <div
         class="flex items-center justify-end gap-3 p-6 border-t border-red-500/20 bg-slate-900/50"
       >
-        <Button variant="primary" onclick={() => (classModalOpen = false)}>
+        <Button variant="primary" onclick={saveClassesChanges}>
           {#snippet icon()}
             <svg
               class="w-5 h-5"
@@ -1187,7 +1215,7 @@
               />
             </svg>
           {/snippet}
-          Guardar
+          Guardar y Cerrar
         </Button>
       </div>
     </div>

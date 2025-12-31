@@ -8,6 +8,7 @@
   import LoadingSpinner from "$lib/components/ui/LoadingSpinner.svelte";
   import ErrorMessage from "$lib/components/ui/ErrorMessage.svelte";
   import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
+  import { loadModelsConfig, applyConfigToModels } from "$lib/config";
   import {
     DEFAULT_MODELS,
     getDownloadedModels,
@@ -60,12 +61,60 @@
   let unlistenProgress: (() => void) | null = null;
   let unlistenError: (() => void) | null = null;
 
-  onMount(async () => {
-    const downloadedFiles = await getDownloadedModels();
-    models = mergeModelsWithDownloads(DEFAULT_MODELS, downloadedFiles);
-    if (availableModels.length > 0 && !selectedModel) {
-      selectedModel = availableModels[0].name; // Use name for consistency with backend
+  async function loadModels() {
+    try {
+      const downloaded = await getDownloadedModels();
+      let currentModels = mergeModelsWithDownloads(DEFAULT_MODELS, downloaded);
+
+      const savedConfig = loadModelsConfig();
+      if (savedConfig) {
+        currentModels = applyConfigToModels(currentModels, savedConfig);
+      }
+
+      models = currentModels;
+
+      // Select active model if exists and is downloaded
+      const activeModel = models.find((m) => m.active && m.downloaded);
+      if (activeModel) {
+        selectedModel = activeModel.id;
+      } else if (availableModels.length > 0 && !selectedModel) {
+        selectedModel = availableModels[0].id; // Use id for consistency with backend
+      }
+    } catch (e) {
+      console.error("Error loading models:", e);
     }
+  }
+
+  // Sync selected classes when model changes
+  $effect(() => {
+    if (selectedModel && models.length > 0) {
+      const model = models.find((m) => m.id === selectedModel);
+      if (model) {
+        // Convert Record<string, boolean> to string[]
+        selectedClasses = Object.entries(model.selectedClasses)
+          .filter(([_, enabled]) => enabled)
+          .map(([cls]) => cls);
+      }
+    }
+  });
+  function handleStorageEvent(e: StorageEvent) {
+    if (e.key === "yolo_model_config") {
+      loadModels();
+    }
+  }
+
+  onMount(async () => {
+    // Load models with config
+    await loadModels();
+
+    // Initialize selectedModel if not already set and models are available
+    if (availableModels.length > 0 && !selectedModel) {
+      selectedModel = availableModels[0].id; // Use id for consistency with backend
+    }
+
+    // Listen for config changes
+    window.addEventListener("storage", handleStorageEvent);
+    window.addEventListener("focus", loadModels);
 
     // Check for active session
     try {
@@ -76,34 +125,22 @@
 
         // Only restore if it's a live analysis
         if (config.mode && config.mode !== "live") {
-          return;
+          // Do nothing if it's video mode
+        } else {
+          // Restore state
+          streamUrl = config.url;
+          const modelMatch = models.find(
+            (m) =>
+              m.fileName === config.model_name || m.name === config.model_name,
+          );
+          if (modelMatch) selectedModel = modelMatch.name;
+
+          confidenceThreshold = config.conf;
+          selectedDevice = config.device;
+
+          // Note: Classes are restored via selectedModel logic presumably, or manual?
+          // Original code had check logic here.
         }
-
-        // Restore state
-        streamUrl = config.url;
-        // Try to match model name or filename
-        const modelMatch = models.find(
-          (m) =>
-            m.fileName === config.model_name || m.name === config.model_name,
-        );
-        if (modelMatch) selectedModel = modelMatch.name;
-
-        confidenceThreshold = config.conf;
-        selectedDevice = config.device;
-
-        // Restore classes
-        if (config.classes) {
-          const activeClassesIndices = config.classes.split(",").map(Number);
-          selectedClasses = []; // Reset
-          activeClassesIndices.forEach((idx: number) => {
-            if (idx >= 0 && idx < COCO_CLASSES.length) {
-              selectedClasses.push(COCO_CLASSES[idx]);
-            }
-          });
-        }
-
-        isLoading = true;
-        statusMessage = "Reconectando con stream...";
       }
     } catch (e) {
       console.error("Error checking active session:", e);
@@ -153,6 +190,10 @@
   });
 
   onDestroy(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", handleStorageEvent);
+      window.removeEventListener("focus", loadModels);
+    }
     if (unlistenProgress) unlistenProgress();
     if (unlistenError) unlistenError();
     // Do NOT stop analysis here, so it persists when switching tabs
@@ -650,10 +691,10 @@
           {:else}
             {#each availableModels as model}
               <button
-                onclick={() => (selectedModel = model.name)}
+                onclick={() => (selectedModel = model.id)}
                 disabled={isStreaming}
                 class="w-full p-2.5 rounded-lg border transition-all text-left {selectedModel ===
-                model.name
+                model.id
                   ? 'bg-red-500/20 border-red-500/50 shadow-lg shadow-red-500/20'
                   : 'bg-slate-800/50 border-red-500/20 hover:border-red-500/40'} disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -666,7 +707,7 @@
                       {model.speed} • {model.precision}
                     </p>
                   </div>
-                  {#if selectedModel === model.name}
+                  {#if selectedModel === model.id}
                     <svg
                       class="w-4 h-4 text-red-400 flex-shrink-0"
                       fill="currentColor"

@@ -11,6 +11,8 @@
     "core:event:default",
     "opener:default",
     "dialog:default",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
     {
       "identifier": "shell:allow-execute",
       "allow": [

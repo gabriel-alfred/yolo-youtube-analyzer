@@ -26,30 +26,34 @@
     const appWindow = getCurrentWindow();
 
     // Intercept close request
-    const unlisten = appWindow.listen(
-      "tauri://close-requested",
-      async (event) => {
-        if (isClosing) return; // Allow close if we already confirmed
+    const unlistenPromise = appWindow.onCloseRequested(async (event) => {
+      // If we are already in the process of closing (confirmed), let it happen.
+      if (isClosing) {
+        return;
+      }
 
-        try {
-          const activeSession = await invoke("get_active_analysis");
-          if (activeSession) {
-            showExitDialog = true;
-          } else {
-            // No analysis -> Just close
-            isClosing = true;
-            appWindow.close();
-          }
-        } catch (e) {
-          console.error("Error checking active analysis on exit:", e);
+      // Prevent the immediate close to check for active analysis
+      event.preventDefault();
+
+      try {
+        const activeSession = await invoke("get_active_analysis");
+        if (activeSession) {
+          showExitDialog = true;
+        } else {
+          // No analysis -> Just close
           isClosing = true;
-          appWindow.close();
+          await appWindow.close();
         }
-      },
-    );
+      } catch (e) {
+        console.error("Error checking active analysis on exit:", e);
+        // On error, force close to avoid locking the user
+        isClosing = true;
+        await appWindow.close();
+      }
+    });
 
     return () => {
-      unlisten.then((f) => f());
+      unlistenPromise.then((f) => f());
     };
   });
 

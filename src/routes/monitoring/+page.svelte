@@ -349,7 +349,7 @@
         .filter((idx) => idx !== -1)
         .join(",");
 
-      const modelObj = models.find((m) => m.name === selectedModel);
+      const modelObj = models.find((m) => m.id === selectedModel);
       const modelFileName = modelObj ? modelObj.fileName : selectedModel;
 
       await invoke("start_live_analysis", {

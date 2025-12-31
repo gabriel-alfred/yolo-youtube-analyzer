@@ -36,6 +36,7 @@
   let error = $state("");
   let statusMessage = $state("");
   let showStopDialog = $state(false);
+  let showConflictDialog = $state(false);
   let showPreview = $state(false);
   let liveFrameData = $state<string | null>(null);
   let currentFps = $state(0);
@@ -109,6 +110,9 @@
     }
 
     unlistenProgress = await listen("analysis-progress", (event: any) => {
+      // Guard: If not streaming or setting up, ignore events
+      if (!isStreaming && !isLoading) return;
+
       const payload = event.payload;
 
       if (payload.status === "frame" && payload.frame_data) {
@@ -265,8 +269,15 @@
       });
     } catch (e) {
       console.error("Error starting stream:", e);
+
+      const errorMsg = String(e);
+      if (errorMsg.includes("Ya hay un análisis en curso")) {
+        showConflictDialog = true;
+      }
+
       error = String(e);
       isLoading = false;
+      isStreaming = false;
     }
   }
 
@@ -793,6 +804,18 @@
   confirmText="Detener"
   cancelText="Continuar"
   onConfirm={confirmStopStreaming}
+/>
+
+<ConfirmationDialog
+  bind:open={showConflictDialog}
+  title="Análisis en curso"
+  message="Ya existe un análisis activo en otra pestaña. Debes detenerlo antes de iniciar uno nuevo."
+  confirmText="Entendido"
+  variant="danger"
+  onConfirm={() => {
+    showConflictDialog = false;
+  }}
+  cancelText=""
 />
 
 <style>

@@ -7,6 +7,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import Input from "$lib/components/ui/Input.svelte";
+  import ConfirmationDialog from "$lib/components/ui/ConfirmationDialog.svelte";
   import {
     COCO_CLASSES,
     DEFAULT_MODELS,
@@ -64,6 +65,9 @@
   // Video player en vivo
   let showLivePlayer = $state(false);
   let liveFrameData = $state<string | null>(null);
+  let showConflictDialog = $state(false);
+
+  // Buffer y control de fpsntFrameNumber = $state(0);
   let currentFrameNumber = $state(0);
   let analysisComplete = $state(false);
 
@@ -155,6 +159,19 @@
         quality: quality,
       });
 
+      // Resetear todos los estados
+      analysisComplete = false;
+      progress = 0;
+      statusMessage = "Iniciando análisis...";
+      resultPath = null;
+      currentFrameNumber = 0;
+      liveFrameData = null;
+
+      // await checkFileExists(modelFileName); // This function is not defined in the provided code
+
+      // Descarga de modelo si es necesario (ya manejado en backend pero bueno verificar)
+      // ...
+
       await invoke("start_video_analysis", {
         url: youtubeUrl,
         modelName: modelFileName,
@@ -164,8 +181,24 @@
         frames: frames,
         quality: quality,
       });
+
+      // Only now enables the listener and player
+      analyzing = true;
+      showLivePlayer = true;
     } catch (error) {
       console.error("Error starting analysis:", error);
+
+      const errorMsg = String(error);
+      if (errorMsg.includes("Ya hay un análisis en curso")) {
+        showConflictDialog = true;
+        conflictDialogMessage =
+          "Ya existe un análisis activo en otra pestaña. Debes detenerlo antes de iniciar uno nuevo.";
+        conflictDialogConfirmText = "Entendido";
+        conflictDialogVariant = "danger";
+        conflictDialogCancelText = "";
+        // alert("⚠️ Ya hay un análisis en curso.\n\nPor favor, detenlo antes de iniciar uno nuevo.");
+      }
+
       statusMessage = `Error: ${error}`;
       analyzing = false;
       showLivePlayer = false;
@@ -276,6 +309,9 @@
     }
 
     unlistenProgress = await listen("analysis-progress", (event: any) => {
+      // Guard: If not strictly analyzing, ignore events (to avoid cross-talk with Live Analysis)
+      if (!analyzing && !analysisComplete) return;
+
       const payload = event.payload;
 
       console.log("Progress event:", payload);

@@ -2,9 +2,6 @@
 
 **YOLO YouTube Analyzer** es una potente aplicación de escritorio construida con **Tauri, SvelteKit y Python** que permite realizar análisis de detección de objetos en videos de YouTube y transmisiones en tiempo real utilizando modelos **YOLOv11** y modelos que el usuario pueda importar.
 
-![Dashboard Preview](./static/dashboard-preview.png)
-*(Nota: Asegúrate de añadir una captura de pantalla en `static/` si deseas que se vea aquí)*
-
 ## 🚀 Características Principales
 
 *   **Dashboard Interactivo**: Visualización moderna con seguimiento ocular y acceso rápido a los análisis recientes.
@@ -106,6 +103,12 @@ Para generar el ejecutable instalable (`.exe` o `.msi`):
 npm run tauri build
 ```
 El instalador se generará en `src-tauri/target/release/bundle/nsis/`.
+
+## 📊 Presentación del Proyecto
+
+Puedes ver la presentación completa del proyecto con todos los detalles técnicos, arquitectura y casos de uso en el siguiente enlace:
+
+[📥 Descargar/Ver Presentación PDF](./YOLO-YouTube-Analyzer.pdf)
 
 ## 📄 Licencia
 
